@@ -1,0 +1,13 @@
+src/**
+.vscode/**
+.vscode-test/**
+test/**
+tests/**
+**/*.ts
+tsconfig.json
+.git/**
+.gitignore
+.DS_Store
+*.vsix
+out/extenstion.js
+out/extenstion.js.map

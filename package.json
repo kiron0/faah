@@ -1,0 +1,86 @@
+{
+  "name": "faah",
+  "displayName": "Faah",
+  "description": "Your command output gets dramatic, so Faah gets louder.",
+  "icon": "images/icon.png",
+  "version": "0.0.1",
+  "publisher": "thk",
+  "author": "Toufiq Hasan Kiron",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kiron0/faah.git"
+  },
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "terminalErrorSound.playTestSound",
+        "title": "Faah: Play Test Sound",
+        "category": "Faah"
+      }
+    ],
+    "configuration": {
+      "title": "Faah",
+      "properties": {
+        "terminalErrorSound.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable terminal error sound notifications."
+        },
+        "terminalErrorSound.cooldownMs": {
+          "type": "number",
+          "default": 1500,
+          "minimum": 0,
+          "description": "Minimum time in milliseconds between sound plays."
+        },
+        "terminalErrorSound.soundFile": {
+          "type": "string",
+          "default": "faah.mp3",
+          "description": "Audio filename in the extension's media folder."
+        },
+        "terminalErrorSound.patterns": {
+          "type": "array",
+          "default": [
+            "\\berror\\b",
+            "\\bfailed\\b",
+            "ERR!",
+            "UnhandledPromiseRejection",
+            "Traceback \\(most recent call last\\):",
+            "Exception",
+            "Segmentation fault"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Regex patterns used to detect error lines in terminal output."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "lint": "tsc --noEmit -p ./",
+    "watch": "tsc -w -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-yarn"
+  },
+  "dependencies": {
+    "play-sound": "^1.1.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.11",
+    "@types/play-sound": "^1.1.2",
+    "@types/vscode": "^1.100.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.9.3"
+  }
+}
