@@ -11,7 +11,7 @@
     "url": "https://github.com/kiron0/faah.git"
   },
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.109.0"
   },
   "categories": [
     "Other"
@@ -45,10 +45,10 @@
     "play-sound": "^1.1.6"
   },
   "devDependencies": {
-    "@types/node": "^22.19.11",
+    "@types/node": "^25.3.0",
     "@types/play-sound": "^1.1.2",
-    "@types/vscode": "^1.100.0",
-    "@vscode/vsce": "^3.6.0",
+    "@types/vscode": "^1.109.0",
+    "@vscode/vsce": "^3.7.1",
     "typescript": "^5.9.3"
   }
 }
