@@ -8,7 +8,7 @@
   When your terminal screams, Faah screams louder.
 
   <p>
-    <img src="https://img.shields.io/badge/VS%20Code-1.100.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
+    <img src="https://img.shields.io/badge/VS%20Code-1.109.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
     <img src="https://img.shields.io/badge/Version-0.0.1-111827?style=for-the-badge" />
     <img src="https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge" />
   </p>
