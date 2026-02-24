@@ -6,12 +6,27 @@ import playSound from "play-sound";
 
 import type { RuntimeSettings } from "./settings";
 
-const player = playSound({});
 const fixedSoundFile = "faah.mp3";
 const isWindows = process.platform === "win32";
+const isLinux = process.platform === "linux";
+const linuxPreferredPlayers = [
+  "paplay",
+  "ffplay",
+  "mpv",
+  "cvlc",
+  "mplayer",
+  "mpg123",
+  "mpg321",
+  "play",
+  "aplay",
+];
+const player = playSound(
+  isLinux ? ({ players: linuxPreferredPlayers as any } as any) : {},
+);
 
 let hasWarnedVolumeFallback = false;
 let hasWarnedWindowsFallback = false;
+let hasWarnedLinuxMissingPlayer = false;
 let lastMissingSoundFileWarning: string | null = null;
 
 type PlayMethodOptionsLoose = Record<string, Array<string | number>> & {
@@ -34,6 +49,16 @@ function warnWindowsFallbackOnce(message: string): void {
   console.warn(message);
 }
 
+function warnLinuxPlayerMissingOnce(errorText: string): void {
+  if (!isLinux || hasWarnedLinuxMissingPlayer) return;
+  if (!errorText.toLowerCase().includes("couldn't find a suitable audio player")) return;
+
+  hasWarnedLinuxMissingPlayer = true;
+  vscode.window.showWarningMessage(
+    "Faah could not find a Linux audio player. Install one of: ffmpeg (ffplay), mpv, mpg123, vlc, or sox.",
+  );
+}
+
 export function resolveSoundPath(context: vscode.ExtensionContext): string {
   const soundPath = context.asAbsolutePath(path.join("media", fixedSoundFile));
   if (!fs.existsSync(soundPath)) {
@@ -47,6 +72,7 @@ function playWithoutVolume(soundPath: string): void {
   player.play(soundPath, (err?: ExecException) => {
     if (!err) return;
     const errText = err.message ?? String(err);
+    warnLinuxPlayerMissingOnce(errText);
     console.warn(`Failed to play sound: ${errText}`);
   });
 }
@@ -123,6 +149,29 @@ function playOnWindows(soundPath: string, settings: RuntimeSettings): void {
   });
 }
 
+function playUsingSystemPlayer(soundPath: string, settings: RuntimeSettings): void {
+  if (settings.volumePercent === 100) {
+    playWithoutVolume(soundPath);
+    return;
+  }
+
+  const options = buildCustomVolumeOptions(settings.volumePercent);
+  player.play(soundPath, options as any, (err?: ExecException) => {
+    if (!err) return;
+
+    const errText = err.message ?? String(err);
+    warnLinuxPlayerMissingOnce(errText);
+    if (!hasWarnedVolumeFallback) {
+      hasWarnedVolumeFallback = true;
+      console.warn(
+        `Custom volume options failed with current audio player. Falling back to default volume. Error: ${errText}`,
+      );
+    }
+
+    playWithoutVolume(soundPath);
+  });
+}
+
 function buildCustomVolumeOptions(volumePercent: number): PlayMethodOptionsLoose {
   const ratio = clamp(volumePercent, 0, 100) / 100;
   return {
@@ -140,25 +189,7 @@ function playCustomFileWithVolume(soundPath: string, settings: RuntimeSettings):
     return;
   }
 
-  if (settings.volumePercent === 100) {
-    playWithoutVolume(soundPath);
-    return;
-  }
-
-  const options = buildCustomVolumeOptions(settings.volumePercent);
-  player.play(soundPath, options as any, (err?: ExecException) => {
-    if (!err) return;
-
-    const errText = err.message ?? String(err);
-    if (!hasWarnedVolumeFallback) {
-      hasWarnedVolumeFallback = true;
-      console.warn(
-        `Custom volume options failed with current audio player. Falling back to default volume. Error: ${errText}`,
-      );
-    }
-
-    playWithoutVolume(soundPath);
-  });
+  playUsingSystemPlayer(soundPath, settings);
 }
 
 export function playAlert(settings: RuntimeSettings, soundPath: string): void {

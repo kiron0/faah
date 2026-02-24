@@ -16,6 +16,7 @@ type ModuleMocks = {
   showWarningMessage: ReturnType<typeof vi.fn>;
   spawn: ReturnType<typeof vi.fn>;
   play: ReturnType<typeof vi.fn>;
+  playSoundFactory: ReturnType<typeof vi.fn>;
 };
 
 function createSettings(volumePercent: number): RuntimeSettings {
@@ -63,11 +64,12 @@ async function loadAudio(platform: NodeJS.Platform, options: LoadAudioOptions = 
     callback?.(options.playError);
     return soundPath;
   });
+  const playSoundFactory = vi.fn(() => ({ play }));
 
   vi.doMock("fs", () => ({ existsSync }));
   vi.doMock("vscode", () => ({ window: { showWarningMessage } }));
   vi.doMock("child_process", () => ({ spawn }));
-  vi.doMock("play-sound", () => ({ default: () => ({ play }) }));
+  vi.doMock("play-sound", () => ({ default: playSoundFactory }));
 
   const audio = await import("../../src/audio");
 
@@ -78,6 +80,7 @@ async function loadAudio(platform: NodeJS.Platform, options: LoadAudioOptions = 
       showWarningMessage,
       spawn,
       play,
+      playSoundFactory,
     } as ModuleMocks,
   };
 }
@@ -101,6 +104,7 @@ describe("audio unit tests", () => {
     expect(mocks.play).toHaveBeenCalledTimes(1);
     expect(mocks.spawn).not.toHaveBeenCalled();
     expect(mocks.showWarningMessage).not.toHaveBeenCalled();
+    expect(mocks.playSoundFactory).toHaveBeenCalledWith({});
   });
 
   it("uses play-sound volume options on Linux", async () => {
@@ -116,7 +120,9 @@ describe("audio unit tests", () => {
       mplayer: ["-volume", 40],
       play: ["vol", 0.4],
     });
-    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.playSoundFactory).toHaveBeenCalledWith({
+      players: expect.arrayContaining(["paplay", "ffplay", "mpv", "cvlc", "mplayer", "mpg123"]),
+    });
   });
 
   it("uses hidden PowerShell inline playback on Windows", async () => {
@@ -142,6 +148,17 @@ describe("audio unit tests", () => {
     expect(mocks.showWarningMessage).toHaveBeenCalledTimes(1);
     expect(mocks.play).not.toHaveBeenCalled();
     expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
+  it("shows Linux install guidance when no audio player is found", async () => {
+    const { audio, mocks } = await loadAudio("linux", {
+      playError: new Error("Couldn't find a suitable audio player"),
+    });
+
+    audio.playAlert(createSettings(70), "media/faah.mp3");
+
+    expect(mocks.showWarningMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.showWarningMessage.mock.calls[0][0]).toContain("Install one of");
   });
 
   it("falls back to console beep if Windows inline player exits with non-zero code", async () => {
