@@ -3,7 +3,7 @@
   "displayName": "Faah",
   "description": "Your command output gets dramatic, so Faah gets louder.",
   "icon": "images/icon.png",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {
@@ -23,48 +23,16 @@
   "contributes": {
     "commands": [
       {
+        "command": "terminalErrorSound.openSettingsUI",
+        "title": "Open Settings UI",
+        "category": "Faah"
+      },
+      {
         "command": "terminalErrorSound.playTestSound",
-        "title": "Faah: Play Test Sound",
+        "title": "Play Test Sound",
         "category": "Faah"
       }
-    ],
-    "configuration": {
-      "title": "Faah",
-      "properties": {
-        "terminalErrorSound.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable or disable terminal error sound notifications."
-        },
-        "terminalErrorSound.cooldownMs": {
-          "type": "number",
-          "default": 1500,
-          "minimum": 0,
-          "description": "Minimum time in milliseconds between sound plays."
-        },
-        "terminalErrorSound.soundFile": {
-          "type": "string",
-          "default": "faah.mp3",
-          "description": "Audio filename in the extension's media folder."
-        },
-        "terminalErrorSound.patterns": {
-          "type": "array",
-          "default": [
-            "\\berror\\b",
-            "\\bfailed\\b",
-            "ERR!",
-            "UnhandledPromiseRejection",
-            "Traceback \\(most recent call last\\):",
-            "Exception",
-            "Segmentation fault"
-          ],
-          "items": {
-            "type": "string"
-          },
-          "description": "Regex patterns used to detect error lines in terminal output."
-        }
-      }
-    }
+    ]
   },
   "scripts": {
     "compile": "tsc -p ./",

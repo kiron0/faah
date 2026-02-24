@@ -30,7 +30,7 @@ If your terminal output gets dramatic — **Faah gets louder.**
 
 ## Features
 
-- Plays a custom sound (`faah`) when terminal output matches error patterns
+- Plays a sound (`faah`) when terminal output matches error patterns
 - Lightweight and fast
 - Regex-based error detection
 - Cooldown system to prevent spam
@@ -41,39 +41,20 @@ If your terminal output gets dramatic — **Faah gets louder.**
 
 ## Configuration
 
-You can configure Faah from VS Code settings:
+Faah now uses a dedicated visual settings dashboard.
 
-### Available Settings
+Open Command Palette and run:
 
-| Setting | Type | Default | Description |
-|----------|------|----------|-------------|
-| `terminalErrorSound.enabled` | boolean | `true` | Enable or disable Faah |
-| `terminalErrorSound.cooldownMs` | number | `1500` | Minimum delay between sound triggers |
-| `terminalErrorSound.patterns` | string[] | Built-in patterns | Regex patterns that trigger the sound |
+`Faah: Open Settings UI`
 
-### Default Error Patterns
+From the UI, users can control:
 
-```json
-[
-  "\\berror\\b",
-  "\\bfailed\\b",
-  "ERR!",
-  "UnhandledPromiseRejection",
-  "Exception",
-  "Segmentation fault"
-]
-````
-
-You can add your own patterns for specific tools like:
-
-* `npm`
-* `pnpm`
-* `yarn`
-* `gcc`
-* `python`
-* `docker`
-* `make`
-* custom scripts
+- Enable/disable monitoring
+- Cooldown in milliseconds
+- Volume (`0` to `100`)
+- Pattern mode (`override` or `append`)
+- Regex patterns list (one per line)
+- Save/reset and quick test playback
 
 ---
 
@@ -98,8 +79,8 @@ Faah just makes sure you hear it.
 ---
 
 ## Concept Idea
-Md Shoaaib Taimur
+Md Shoaib Taimur
 
-## 📄 License
+## License
 
 MIT License © Toufiq Hasan Kiron
