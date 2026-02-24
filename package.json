@@ -3,7 +3,7 @@
   "displayName": "Faah",
   "description": "Your command output gets dramatic, so Faah gets louder.",
   "icon": "images/icon.png",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {
@@ -38,6 +38,11 @@
     "compile": "tsc -p ./",
     "lint": "tsc --noEmit -p ./",
     "watch": "tsc -w -p ./",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:smoke": "vitest run tests/smoke",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package --no-yarn"
   },
@@ -49,6 +54,7 @@
     "@types/play-sound": "^1.1.2",
     "@types/vscode": "^1.109.0",
     "@vscode/vsce": "^3.7.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

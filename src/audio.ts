@@ -1,15 +1,17 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { ExecException } from "child_process";
+import { ExecException, spawn } from "child_process";
 import playSound from "play-sound";
 
 import type { RuntimeSettings } from "./settings";
 
 const player = playSound({});
 const fixedSoundFile = "faah.mp3";
+const isWindows = process.platform === "win32";
 
 let hasWarnedVolumeFallback = false;
+let hasWarnedWindowsFallback = false;
 let lastMissingSoundFileWarning: string | null = null;
 
 type PlayMethodOptionsLoose = Record<string, Array<string | number>> & {
@@ -24,6 +26,12 @@ function showMissingSoundFileWarning(): void {
   if (lastMissingSoundFileWarning === fixedSoundFile) return;
   lastMissingSoundFileWarning = fixedSoundFile;
   vscode.window.showWarningMessage(`Faah could not find audio file: ${fixedSoundFile} in media/.`);
+}
+
+function warnWindowsFallbackOnce(message: string): void {
+  if (hasWarnedWindowsFallback) return;
+  hasWarnedWindowsFallback = true;
+  console.warn(message);
 }
 
 export function resolveSoundPath(context: vscode.ExtensionContext): string {
@@ -43,6 +51,78 @@ function playWithoutVolume(soundPath: string): void {
   });
 }
 
+function escapePowerShellSingleQuoted(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function playWindowsBeepFallback(volumePercent: number): void {
+  if (volumePercent <= 0) return;
+
+  const frequency = 880;
+  const duration = 180;
+  const script = `[console]::Beep(${frequency}, ${duration})`;
+  const fallbackProcess = spawn(
+    "powershell",
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+    {
+      stdio: "ignore",
+      windowsHide: true,
+    },
+  );
+
+  fallbackProcess.on("error", (err) => {
+    warnWindowsFallbackOnce(`Windows fallback beep failed: ${err.message}`);
+  });
+}
+
+function playOnWindows(soundPath: string, settings: RuntimeSettings): void {
+  const escapedSoundPath = escapePowerShellSingleQuoted(soundPath);
+  const volumeRatio = clamp(settings.volumePercent, 0, 100) / 100;
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    "Add-Type -AssemblyName PresentationCore",
+    `$path = '${escapedSoundPath}'`,
+    "if (-not (Test-Path -LiteralPath $path)) { throw \"Sound file not found\" }",
+    "$player = New-Object System.Windows.Media.MediaPlayer",
+    `$player.Volume = ${volumeRatio.toFixed(2)}`,
+    "$player.Open([Uri]::new($path))",
+    "$loadTimeoutAt = (Get-Date).AddSeconds(5)",
+    "while (-not $player.NaturalDuration.HasTimeSpan -and (Get-Date) -lt $loadTimeoutAt) { Start-Sleep -Milliseconds 50 }",
+    "$player.Play()",
+    "$waitMs = 2000",
+    "if ($player.NaturalDuration.HasTimeSpan) {",
+    "  $waitMs = [Math]::Min(15000, [Math]::Max(300, [int]([Math]::Ceiling($player.NaturalDuration.TimeSpan.TotalMilliseconds) + 150)))",
+    "}",
+    "Start-Sleep -Milliseconds $waitMs",
+    "$player.Stop()",
+    "$player.Close()",
+  ].join("; ");
+
+  const playbackProcess = spawn(
+    "powershell",
+    ["-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-Command", script],
+    {
+      stdio: "ignore",
+      windowsHide: true,
+    },
+  );
+
+  playbackProcess.on("error", (err) => {
+    warnWindowsFallbackOnce(
+      `Failed to play sound with hidden Windows player. Falling back to console beep. Error: ${err.message}`,
+    );
+    playWindowsBeepFallback(settings.volumePercent);
+  });
+
+  playbackProcess.on("close", (code) => {
+    if (code === 0 || code === null) return;
+    warnWindowsFallbackOnce(
+      `Windows inline audio playback exited with code ${code}. Falling back to console beep.`,
+    );
+    playWindowsBeepFallback(settings.volumePercent);
+  });
+}
+
 function buildCustomVolumeOptions(volumePercent: number): PlayMethodOptionsLoose {
   const ratio = clamp(volumePercent, 0, 100) / 100;
   return {
@@ -55,6 +135,11 @@ function buildCustomVolumeOptions(volumePercent: number): PlayMethodOptionsLoose
 }
 
 function playCustomFileWithVolume(soundPath: string, settings: RuntimeSettings): void {
+  if (isWindows) {
+    playOnWindows(soundPath, settings);
+    return;
+  }
+
   if (settings.volumePercent === 100) {
     playWithoutVolume(soundPath);
     return;
