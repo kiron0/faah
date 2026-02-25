@@ -5,7 +5,7 @@
 
   ### Your Error Drama Alarm for VS Code
 
-  When your workflow screams, Faah screams louder.
+  When errors get dramatic, Faah gets louder.
 
   <p>
     <img src="https://img.shields.io/badge/VS%20Code-1.109.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
