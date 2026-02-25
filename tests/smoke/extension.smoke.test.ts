@@ -9,10 +9,14 @@ type Harness = {
   };
   getStartHandler: () => ((event: { execution: unknown }) => void) | undefined;
   getEndHandler: () => ((event: { execution: unknown; exitCode?: number }) => void) | undefined;
+  getActiveEditorHandler: () => (() => void) | undefined;
+  getDiagnosticsHandler: () => ((event: { uris: unknown[] }) => void) | undefined;
   commandHandlers: Map<string, () => void>;
   mocks: {
     monitorExecutionOutput: ReturnType<typeof vi.fn>;
     tryPlayForExecution: ReturnType<typeof vi.fn>;
+    onDiagnosticsChanged: ReturnType<typeof vi.fn>;
+    scanActiveEditorDiagnostics: ReturnType<typeof vi.fn>;
     playAlert: ReturnType<typeof vi.fn>;
     registerSettingsUiCommand: ReturnType<typeof vi.fn>;
     persistStoredSettings: ReturnType<typeof vi.fn>;
@@ -47,10 +51,14 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
 
   let startHandler: ((event: { execution: unknown }) => void) | undefined;
   let endHandler: ((event: { execution: unknown; exitCode?: number }) => void) | undefined;
+  let activeEditorHandler: (() => void) | undefined;
+  let diagnosticsHandler: ((event: { uris: unknown[] }) => void) | undefined;
 
   const commandHandlers = new Map<string, () => void>();
   const monitorExecutionOutput = vi.fn(async () => {});
   const tryPlayForExecution = vi.fn();
+  const onDiagnosticsChanged = vi.fn();
+  const scanActiveEditorDiagnostics = vi.fn();
   const playAlert = vi.fn();
   const resolveSoundPath = vi.fn(() => "media/faah.mp3");
   const registerSettingsUiCommand = vi.fn(() => ({ dispose: vi.fn() }));
@@ -65,6 +73,8 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
 
   const startDisposable = { dispose: vi.fn() };
   const endDisposable = { dispose: vi.fn() };
+  const activeEditorDisposable = { dispose: vi.fn() };
+  const diagnosticsDisposable = { dispose: vi.fn() };
   const commandDisposable = { dispose: vi.fn() };
   const settingsDisposable = { dispose: vi.fn() };
 
@@ -80,6 +90,16 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
           return endDisposable;
         },
       ),
+      onDidChangeActiveTextEditor: vi.fn((cb: () => void) => {
+        activeEditorHandler = cb;
+        return activeEditorDisposable;
+      }),
+    },
+    languages: {
+      onDidChangeDiagnostics: vi.fn((cb: (event: { uris: unknown[] }) => void) => {
+        diagnosticsHandler = cb;
+        return diagnosticsDisposable;
+      }),
     },
     commands: {
       registerCommand: vi.fn((id: string, cb: () => void) => {
@@ -96,6 +116,10 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
   vi.doMock("../../src/execution-monitor", () => ({
     monitorExecutionOutput,
     tryPlayForExecution,
+  }));
+  vi.doMock("../../src/diagnostics-monitor", () => ({
+    onDiagnosticsChanged,
+    scanActiveEditorDiagnostics,
   }));
   vi.doMock("../../src/settings-webview", () => ({
     registerSettingsUiCommand: vi.fn(
@@ -124,10 +148,14 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
     context,
     getStartHandler: () => startHandler,
     getEndHandler: () => endHandler,
+    getActiveEditorHandler: () => activeEditorHandler,
+    getDiagnosticsHandler: () => diagnosticsHandler,
     commandHandlers,
     mocks: {
       monitorExecutionOutput,
       tryPlayForExecution,
+      onDiagnosticsChanged,
+      scanActiveEditorDiagnostics,
       playAlert,
       registerSettingsUiCommand,
       persistStoredSettings,
@@ -140,16 +168,21 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
 }
 
 describe("extension smoke tests", () => {
-  it("wires commands and terminal listeners on activate", async () => {
+  it("wires terminal and diagnostics listeners on activate", async () => {
     const harness = await loadExtensionHarness(true);
     harness.extension.activate(harness.context as any);
     const startHandler = harness.getStartHandler();
     const endHandler = harness.getEndHandler();
+    const activeEditorHandler = harness.getActiveEditorHandler();
+    const diagnosticsHandler = harness.getDiagnosticsHandler();
 
-    expect(harness.context.subscriptions).toHaveLength(4);
+    expect(harness.context.subscriptions).toHaveLength(6);
     expect(startHandler).toBeTypeOf("function");
     expect(endHandler).toBeTypeOf("function");
+    expect(activeEditorHandler).toBeTypeOf("function");
+    expect(diagnosticsHandler).toBeTypeOf("function");
     expect(harness.commandHandlers.has("terminalErrorSound.playTestSound")).toBe(true);
+    expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(1);
 
     const execution = {};
     startHandler?.({ execution });
@@ -161,6 +194,12 @@ describe("extension smoke tests", () => {
       harness.runtimeSettings,
       harness.soundPath,
     );
+
+    diagnosticsHandler?.({ uris: [{}] });
+    expect(harness.mocks.onDiagnosticsChanged).toHaveBeenCalledTimes(1);
+
+    activeEditorHandler?.();
+    expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(2);
 
     const testCommand = harness.commandHandlers.get("terminalErrorSound.playTestSound");
     testCommand?.();

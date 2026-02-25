@@ -3,13 +3,13 @@
 
   # Faah
 
-  ### Your Command-Line Drama Alarm for VS Code
+  ### Your Error Drama Alarm for VS Code
 
-  When your terminal screams, Faah screams louder.
+  When your terminal or active file screams, Faah screams louder.
 
   <p>
     <img src="https://img.shields.io/badge/VS%20Code-1.109.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
-    <img src="https://img.shields.io/badge/Version-0.1.1-111827?style=for-the-badge" />
+    <img src="https://img.shields.io/badge/Version-0.1.2-111827?style=for-the-badge" />
     <img src="https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge" />
   </p>
 </div>
@@ -18,24 +18,25 @@
 
 ## Overview
 
-**Faah** is a lightweight VS Code extension that listens to your terminal output and plays a sound whenever an error appears.
+**Faah** is a lightweight VS Code extension that listens to terminal output and active-file diagnostics, then plays a sound whenever an error appears.
 
 No more silent failures.
 No more unnoticed broken builds.
 No more cursed command output.
 
-If your terminal output gets dramatic — **Faah gets louder.**
+If your errors get dramatic — **Faah gets louder.**
 
 ---
 
 ## Features
 
 - Plays a sound (`faah`) when terminal output matches error patterns
+- Plays a sound for errors in the currently active editor file
 - Lightweight and fast
 - Regex-based error detection
 - Cooldown system to prevent spam
 - Fully configurable patterns
-- Works with terminal commands and build tools
+- Works with terminal commands, build tools, and active-file diagnostics
 
 ---
 

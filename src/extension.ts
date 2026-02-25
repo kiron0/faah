@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 
 import { playAlert, resolveSoundPath } from "./audio";
+import { onDiagnosticsChanged, scanActiveEditorDiagnostics } from "./diagnostics-monitor";
 import { monitorExecutionOutput, tryPlayForExecution } from "./execution-monitor";
 import { registerSettingsUiCommand } from "./settings-webview";
 import {
@@ -48,11 +49,23 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
 
+  const diagnosticsDisposable = vscode.languages.onDidChangeDiagnostics((event) => {
+    onDiagnosticsChanged(event, () => settings, () => soundPath);
+  });
+
+  const activeEditorDisposable = vscode.window.onDidChangeActiveTextEditor(() => {
+    scanActiveEditorDiagnostics(() => settings, () => soundPath);
+  });
+
+  scanActiveEditorDiagnostics(() => settings, () => soundPath);
+
   context.subscriptions.push(
     startDisposable,
     endDisposable,
     settingsUiDisposable,
     testSoundDisposable,
+    diagnosticsDisposable,
+    activeEditorDisposable,
   );
 }
 

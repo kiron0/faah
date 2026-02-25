@@ -1,15 +1,16 @@
 {
   "name": "faah",
   "displayName": "Faah",
-  "description": "Your command output gets dramatic, so Faah gets louder.",
+  "description": "When terminal or editor errors get dramatic, Faah gets louder.",
   "icon": "images/icon.png",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {
     "type": "git",
     "url": "https://github.com/kiron0/faah.git"
   },
+  "homepage": "https://faah.kiron.dev",
   "engines": {
     "vscode": "^1.109.0"
   },
