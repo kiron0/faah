@@ -1,20 +1,13 @@
 import * as vscode from "vscode";
 
+import { tryAcquirePlaybackWindow } from "./alert-gate";
 import { playAlert } from "./audio";
 import type { RuntimeSettings } from "./settings";
 
-let lastPlayedAt = 0;
 const tailByExecution = new WeakMap<vscode.TerminalShellExecution, string>();
 const playedByExecution = new WeakSet<vscode.TerminalShellExecution>();
 const maxTailLength = 500;
 const ansiEscapeRegex = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
-
-function shouldPlayNow(cooldownMs: number): boolean {
-  const now = Date.now();
-  if (now - lastPlayedAt < cooldownMs) return false;
-  lastPlayedAt = now;
-  return true;
-}
 
 function looksLikeError(line: string, patterns: RegExp[]): boolean {
   return patterns.some((r) => r.test(line));
@@ -51,7 +44,7 @@ export function tryPlayForExecution(
   soundPath: string,
 ): void {
   if (playedByExecution.has(execution)) return;
-  if (!shouldPlayNow(settings.cooldownMs)) return;
+  if (!tryAcquirePlaybackWindow(settings.cooldownMs)) return;
 
   playedByExecution.add(execution);
   playAlert(settings, soundPath);

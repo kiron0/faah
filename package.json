@@ -1,7 +1,7 @@
 {
   "name": "faah",
   "displayName": "Faah",
-  "description": "When terminal or editor errors get dramatic, Faah gets louder.",
+  "description": "When errors get dramatic, Faah gets louder.",
   "icon": "images/icon.png",
   "version": "0.1.2",
   "publisher": "thk",

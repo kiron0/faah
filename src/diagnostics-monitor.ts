@@ -1,17 +1,10 @@
 import * as vscode from "vscode";
 
+import { tryAcquirePlaybackWindow } from "./alert-gate";
 import { playAlert } from "./audio";
 import type { RuntimeSettings } from "./settings";
 
-let lastPlayedAt = 0;
 const lastFingerprintByUri = new Map<string, string>();
-
-function shouldPlayNow(cooldownMs: number): boolean {
-  const now = Date.now();
-  if (now - lastPlayedAt < cooldownMs) return false;
-  lastPlayedAt = now;
-  return true;
-}
 
 function normalizeDiagnosticCode(code: vscode.Diagnostic["code"]): string {
   if (typeof code === "string" || typeof code === "number") return String(code);
@@ -55,10 +48,9 @@ function tryPlayForEditor(
   }
 
   if (nextFingerprint === previousFingerprint) return;
+  if (!tryAcquirePlaybackWindow(settings.cooldownMs)) return;
 
   lastFingerprintByUri.set(uriKey, nextFingerprint);
-
-  if (!shouldPlayNow(settings.cooldownMs)) return;
   playAlert(settings, soundPath);
 }
 
