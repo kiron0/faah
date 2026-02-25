@@ -1,8 +1,8 @@
-let lastPlayedAt = 0;
+let lastPlaybackAtMs = 0;
 
 export function tryAcquirePlaybackWindow(cooldownMs: number): boolean {
-  const now = Date.now();
-  if (now - lastPlayedAt < cooldownMs) return false;
-  lastPlayedAt = now;
+  const nowMs = Date.now();
+  if (nowMs - lastPlaybackAtMs < cooldownMs) return false;
+  lastPlaybackAtMs = nowMs;
   return true;
 }

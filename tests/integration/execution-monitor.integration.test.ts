@@ -66,6 +66,34 @@ describe("execution monitor integration tests", () => {
     expect(playAlert).not.toHaveBeenCalled();
   });
 
+  it("ignores benign commit summary lines that only contain the word error", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution(["[main abcdef1] feat: now handle active file error\n"]) as any;
+    const settings = createSettings();
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.mp3",
+    );
+
+    expect(playAlert).not.toHaveBeenCalled();
+  });
+
+  it("still plays for real terminal errors", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution(["error: command failed with exit code 1\n"]) as any;
+    const settings = createSettings();
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.mp3",
+    );
+
+    expect(playAlert).toHaveBeenCalledTimes(1);
+  });
+
   it("prevents duplicate playback for the same execution", async () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
     const execution = createExecution([]) as any;

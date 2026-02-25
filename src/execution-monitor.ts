@@ -6,33 +6,93 @@ import type { RuntimeSettings } from "./settings";
 
 const tailByExecution = new WeakMap<vscode.TerminalShellExecution, string>();
 const playedByExecution = new WeakSet<vscode.TerminalShellExecution>();
-const maxTailLength = 500;
-const ansiEscapeRegex = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 
-function looksLikeError(line: string, patterns: RegExp[]): boolean {
-  return patterns.some((r) => r.test(line));
+const MAX_TAIL_LENGTH = 500;
+const LINE_SPLIT_REGEX = /\r?\n/;
+const ANSI_ESCAPE_REGEX = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
+const BARE_ERROR_WORD_REGEX = /\berror\b/i;
+const STRONG_ERROR_HINT_PATTERN_PARTS = [
+  "failed",
+  "failure",
+  "fatal",
+  "exception",
+  "critical",
+  "uncaught",
+  "traceback",
+  "syntaxerror",
+  "typeerror",
+  "referenceerror",
+  "rangeerror",
+  "module\\s+not\\s+found",
+  "cannot\\s+find\\s+module",
+  "no\\s+module\\s+named",
+  "segmentation\\s+fault",
+  "core\\s+dumped",
+  "panic",
+  "permission\\s+denied",
+  "access\\s+denied",
+  "command\\s+not\\s+found",
+  "timeout",
+  "connection\\s+(?:refused|reset|timed\\s*out)",
+  "http\\s+5\\d\\d",
+] as const;
+const STRONG_ERROR_HINT_REGEX = new RegExp(
+  `\\b(?:${STRONG_ERROR_HINT_PATTERN_PARTS.join("|")})\\b`,
+  "i",
+);
+const GIT_COMMIT_SUMMARY_REGEX = /^\[[^\]]+\s[0-9a-f]{7,40}\]\s.+$/i;
+const CONVENTIONAL_COMMIT_TYPE_PART = [
+  "feat",
+  "fix",
+  "docs",
+  "style",
+  "refactor",
+  "perf",
+  "test",
+  "build",
+  "ci",
+  "chore",
+  "revert",
+].join("|");
+const CONVENTIONAL_COMMIT_SUBJECT_REGEX = new RegExp(
+  `^(?:\\[[^\\]]+\\]\\s+)?(?:${CONVENTIONAL_COMMIT_TYPE_PART})(?:\\([^)]+\\))?!?:\\s.+$`,
+  "i",
+);
+
+function looksLikeError(line: string, patterns: readonly RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(line));
 }
 
-function cleanTerminalText(text: string): string {
-  return text.replace(ansiEscapeRegex, "").trim();
+function normalizeTerminalLine(text: string): string {
+  return text.replace(ANSI_ESCAPE_REGEX, "").trim();
+}
+
+function isBenignCommitSummaryLine(line: string): boolean {
+  if (!BARE_ERROR_WORD_REGEX.test(line)) return false;
+  if (STRONG_ERROR_HINT_REGEX.test(line)) return false;
+
+  return (
+    GIT_COMMIT_SUMMARY_REGEX.test(line) || CONVENTIONAL_COMMIT_SUBJECT_REGEX.test(line)
+  );
 }
 
 function hasErrorInChunk(
   execution: vscode.TerminalShellExecution,
   chunk: string,
-  patterns: RegExp[],
+  patterns: readonly RegExp[],
 ): boolean {
   const previousTail = tailByExecution.get(execution) ?? "";
-  const combined = previousTail + chunk;
-  const lines = combined.split(/\r?\n/);
+  const lines = (previousTail + chunk).split(LINE_SPLIT_REGEX);
   const tail = lines.pop() ?? "";
 
-  tailByExecution.set(execution, tail.slice(-maxTailLength));
+  tailByExecution.set(execution, tail.slice(-MAX_TAIL_LENGTH));
 
   for (const rawLine of lines) {
-    const line = cleanTerminalText(rawLine);
+    const line = normalizeTerminalLine(rawLine);
     if (!line) continue;
-    if (looksLikeError(line, patterns)) return true;
+    if (!looksLikeError(line, patterns)) continue;
+    if (isBenignCommitSummaryLine(line)) continue;
+    return true;
   }
 
   return false;

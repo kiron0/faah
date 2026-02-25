@@ -5,6 +5,7 @@ import { playAlert } from "./audio";
 import type { RuntimeSettings } from "./settings";
 
 const lastFingerprintByUri = new Map<string, string>();
+const FINGERPRINT_LINE_SEPARATOR = "\n";
 
 function normalizeDiagnosticCode(code: vscode.Diagnostic["code"]): string {
   if (typeof code === "string" || typeof code === "number") return String(code);
@@ -12,22 +13,23 @@ function normalizeDiagnosticCode(code: vscode.Diagnostic["code"]): string {
   return String(code.value);
 }
 
-function getErrorFingerprint(uri: vscode.Uri): string | null {
+function serializeDiagnostic(diagnostic: vscode.Diagnostic): string {
+  const code = normalizeDiagnosticCode(diagnostic.code);
+  const source = diagnostic.source ?? "";
+  const range =
+    `${diagnostic.range.start.line}:${diagnostic.range.start.character}` +
+    `-${diagnostic.range.end.line}:${diagnostic.range.end.character}`;
+  return `${source}|${code}|${range}|${diagnostic.message}`;
+}
+
+function createErrorFingerprint(uri: vscode.Uri): string | null {
   const errors = vscode.languages
     .getDiagnostics(uri)
     .filter((diagnostic) => diagnostic.severity === vscode.DiagnosticSeverity.Error);
 
   if (errors.length === 0) return null;
 
-  return errors
-    .map((diagnostic) => {
-      const code = normalizeDiagnosticCode(diagnostic.code);
-      const source = diagnostic.source ?? "";
-      const range = `${diagnostic.range.start.line}:${diagnostic.range.start.character}-${diagnostic.range.end.line}:${diagnostic.range.end.character}`;
-      return `${source}|${code}|${range}|${diagnostic.message}`;
-    })
-    .sort()
-    .join("\n");
+  return errors.map(serializeDiagnostic).sort().join(FINGERPRINT_LINE_SEPARATOR);
 }
 
 function tryPlayForEditor(
@@ -39,7 +41,7 @@ function tryPlayForEditor(
 
   const uri = editor.document.uri;
   const uriKey = uri.toString();
-  const nextFingerprint = getErrorFingerprint(uri);
+  const nextFingerprint = createErrorFingerprint(uri);
   const previousFingerprint = lastFingerprintByUri.get(uriKey) ?? null;
 
   if (!nextFingerprint) {
