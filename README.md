@@ -9,12 +9,12 @@
 
   <p>
     <img src="https://img.shields.io/badge/VS%20Code-1.109.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
-    <img src="https://img.shields.io/badge/Version-0.1.2-111827?style=for-the-badge" />
+    <img src="https://img.shields.io/badge/Version-0.1.3-111827?style=for-the-badge" />
     <img src="https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge" />
   </p>
 
   <p>
-    Homepage: <a href="https://faah.kiron.dev">https://faah.kiron.dev</a>
+    For more: <a href="https://faah.kiron.dev">Faah Official Docs</a>
   </p>
 </div>
 
@@ -38,6 +38,10 @@ If your errors get dramatic — **Faah gets louder.**
 - Lightweight and fast
 - Regex-based error detection
 - Cooldown system to prevent spam
+- Terminal and editor diagnostics source toggles
+- Diagnostics severity mode (`Error` or `Error + Warning`)
+- Built-in false-positive exclude patterns you can edit
+- Status bar indicator with source-aware quick actions
 - Fully configurable patterns
 - Works smoothly across your coding workflow
 
@@ -45,20 +49,14 @@ If your errors get dramatic — **Faah gets louder.**
 
 ## Configuration
 
-Faah now uses a dedicated visual settings dashboard.
+Use Faah from the status bar.
 
-Open Command Palette and run:
+1. In VS Code, click `Faah Off`, `Faah T`, `Faah E`, or `Faah T+E` in the bottom bar.
+2. Choose what you want: turn Faah on/off, select terminal/editor/both, switch error mode, play test sound, or open full settings.
 
-`Faah: Open Settings UI`
+If you prefer Command Palette, run:
 
-From the UI, users can control:
-
-- Enable/disable monitoring
-- Cooldown in milliseconds
-- Volume (`0` to `100`)
-- Pattern mode (`override` or `append`)
-- Regex patterns list (one per line)
-- Save/reset and quick test playback
+`Faah: Show Quick Actions`
 
 ---
 

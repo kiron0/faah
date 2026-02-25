@@ -9,9 +9,13 @@ type FakeUri = {
 function createSettings(overrides: Partial<RuntimeSettings> = {}): RuntimeSettings {
   return {
     enabled: true,
+    monitorTerminal: true,
+    monitorDiagnostics: true,
+    diagnosticsSeverity: "error",
     cooldownMs: 0,
     volumePercent: 70,
     patterns: [/error/i],
+    excludePatterns: [],
     ...overrides,
   };
 }
@@ -136,6 +140,38 @@ describe("diagnostics monitor integration tests", () => {
     const activeKey = harness.activeUri.toString();
 
     harness.diagnosticsByUri.set(activeKey, [createDiagnostic("warning only", 1)]);
+
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.mp3",
+    );
+
+    expect(harness.playAlert).not.toHaveBeenCalled();
+  });
+
+  it("plays for warning diagnostics when severity mode is warningAndError", async () => {
+    const harness = await loadDiagnosticsMonitorHarness();
+    const settings = createSettings({ diagnosticsSeverity: "warningAndError" });
+    const activeKey = harness.activeUri.toString();
+
+    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("warning only", 1)]);
+
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.mp3",
+    );
+
+    expect(harness.playAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not play for excluded diagnostic messages", async () => {
+    const harness = await loadDiagnosticsMonitorHarness();
+    const settings = createSettings({
+      excludePatterns: [/^Type 'undefined' is not assignable/i],
+    });
+    const activeKey = harness.activeUri.toString();
+
+    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("Type 'undefined' is not assignable to type 'Item[]'.")]);
 
     harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
       () => settings,

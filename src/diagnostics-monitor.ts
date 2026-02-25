@@ -13,6 +13,22 @@ function normalizeDiagnosticCode(code: vscode.Diagnostic["code"]): string {
   return String(code.value);
 }
 
+function isDiagnosticSeverityAllowed(
+  severity: vscode.DiagnosticSeverity,
+  mode: RuntimeSettings["diagnosticsSeverity"],
+): boolean {
+  if (severity === vscode.DiagnosticSeverity.Error) return true;
+  if (mode === "warningAndError" && severity === vscode.DiagnosticSeverity.Warning) return true;
+  return false;
+}
+
+function isDiagnosticExcluded(
+  diagnostic: vscode.Diagnostic,
+  excludePatterns: readonly RegExp[],
+): boolean {
+  return excludePatterns.some((pattern) => pattern.test(diagnostic.message));
+}
+
 function serializeDiagnostic(diagnostic: vscode.Diagnostic): string {
   const code = normalizeDiagnosticCode(diagnostic.code);
   const source = diagnostic.source ?? "";
@@ -22,14 +38,17 @@ function serializeDiagnostic(diagnostic: vscode.Diagnostic): string {
   return `${source}|${code}|${range}|${diagnostic.message}`;
 }
 
-function createErrorFingerprint(uri: vscode.Uri): string | null {
-  const errors = vscode.languages
+function createMonitoredDiagnosticsFingerprint(uri: vscode.Uri, settings: RuntimeSettings): string | null {
+  const monitoredDiagnostics = vscode.languages
     .getDiagnostics(uri)
-    .filter((diagnostic) => diagnostic.severity === vscode.DiagnosticSeverity.Error);
+    .filter((diagnostic) =>
+      isDiagnosticSeverityAllowed(diagnostic.severity, settings.diagnosticsSeverity),
+    )
+    .filter((diagnostic) => !isDiagnosticExcluded(diagnostic, settings.excludePatterns));
 
-  if (errors.length === 0) return null;
+  if (monitoredDiagnostics.length === 0) return null;
 
-  return errors.map(serializeDiagnostic).sort().join(FINGERPRINT_LINE_SEPARATOR);
+  return monitoredDiagnostics.map(serializeDiagnostic).sort().join(FINGERPRINT_LINE_SEPARATOR);
 }
 
 function tryPlayForEditor(
@@ -37,11 +56,11 @@ function tryPlayForEditor(
   settings: RuntimeSettings,
   soundPath: string,
 ): void {
-  if (!editor || !settings.enabled) return;
+  if (!editor || !settings.enabled || !settings.monitorDiagnostics) return;
 
   const uri = editor.document.uri;
   const uriKey = uri.toString();
-  const nextFingerprint = createErrorFingerprint(uri);
+  const nextFingerprint = createMonitoredDiagnosticsFingerprint(uri, settings);
   const previousFingerprint = lastFingerprintByUri.get(uriKey) ?? null;
 
   if (!nextFingerprint) {

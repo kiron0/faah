@@ -3,7 +3,7 @@
   "displayName": "Faah",
   "description": "When errors get dramatic, Faah gets louder.",
   "icon": "images/icon.png",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {
@@ -24,13 +24,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "terminalErrorSound.openSettingsUI",
-        "title": "Open Settings UI",
-        "category": "Faah"
-      },
-      {
-        "command": "terminalErrorSound.playTestSound",
-        "title": "Play Test Sound",
+        "command": "faah.showQuickActions",
+        "title": "Show Quick Actions",
         "category": "Faah"
       }
     ]

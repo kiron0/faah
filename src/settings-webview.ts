@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 
+import { commandIds } from "./commands";
 import {
   defaultStoredSettings,
   normalizeStoredSettings,
@@ -396,6 +397,29 @@ function renderSettingsWebview(
         </div>
       </article>
 
+      <article class="card full">
+        <label>Detection Sources</label>
+        <div class="row">
+          <div>
+            <div>Terminal Output</div>
+            <div class="hint">Play alerts for terminal command output.</div>
+          </div>
+          <button id="monitorTerminalSwitch" class="switch" type="button" aria-label="Toggle terminal monitoring"><span></span></button>
+        </div>
+        <div class="row" style="margin-top: 10px;">
+          <div>
+            <div>Editor Diagnostics</div>
+            <div class="hint">Play alerts for problems in the active editor file.</div>
+          </div>
+          <button id="monitorDiagnosticsSwitch" class="switch" type="button" aria-label="Toggle diagnostics monitoring"><span></span></button>
+        </div>
+        <label for="diagnosticsSeverity" style="margin-top: 12px;">Diagnostics Severity</label>
+        <select id="diagnosticsSeverity">
+          <option value="error">Error only</option>
+          <option value="warningAndError">Error + Warning</option>
+        </select>
+      </article>
+
       <article class="card">
         <label for="cooldownMs">Cooldown (ms)</label>
         <div class="volume-row">
@@ -438,6 +462,12 @@ function renderSettingsWebview(
         <textarea id="patterns" spellcheck="false"></textarea>
         <div class="hint">Invalid regex lines are ignored safely during detection.</div>
       </article>
+
+      <article class="card full">
+        <label for="excludePatterns">Exclude Patterns (one regex per line)</label>
+        <textarea id="excludePatterns" spellcheck="false"></textarea>
+        <div class="hint">Lines or diagnostics matching these regexes are ignored to reduce false positives.</div>
+      </article>
     </section>
 
     <section class="actions">
@@ -460,6 +490,9 @@ function renderSettingsWebview(
 
     const ui = {
       enabledSwitch: document.getElementById("enabledSwitch"),
+      monitorTerminalSwitch: document.getElementById("monitorTerminalSwitch"),
+      monitorDiagnosticsSwitch: document.getElementById("monitorDiagnosticsSwitch"),
+      diagnosticsSeverity: document.getElementById("diagnosticsSeverity"),
       cooldownMs: document.getElementById("cooldownMs"),
       cooldownLabel: document.getElementById("cooldownLabel"),
       volumePercent: document.getElementById("volumePercent"),
@@ -467,6 +500,7 @@ function renderSettingsWebview(
       patternModeOverride: document.getElementById("patternModeOverride"),
       patternModeAppend: document.getElementById("patternModeAppend"),
       patterns: document.getElementById("patterns"),
+      excludePatterns: document.getElementById("excludePatterns"),
       appendReadonlyWrap: document.getElementById("appendReadonlyWrap"),
       builtInPatternsList: document.getElementById("builtInPatternsList"),
       saveBtn: document.getElementById("saveBtn"),
@@ -476,8 +510,14 @@ function renderSettingsWebview(
     };
 
     let enabled = true;
+    let monitorTerminal = true;
+    let monitorDiagnostics = true;
     let statusTimer = null;
     let suppressNextSavedStatus = false;
+
+    function setSwitchState(element, isOn) {
+      element.classList.toggle("on", isOn);
+    }
 
     function syncCooldownLabel() {
       ui.cooldownLabel.textContent = ui.cooldownMs.value + "ms";
@@ -485,7 +525,13 @@ function renderSettingsWebview(
 
     function applySettings(settings) {
       enabled = !!settings.enabled;
-      ui.enabledSwitch.classList.toggle("on", enabled);
+      monitorTerminal = !!settings.monitorTerminal;
+      monitorDiagnostics = !!settings.monitorDiagnostics;
+      setSwitchState(ui.enabledSwitch, enabled);
+      setSwitchState(ui.monitorTerminalSwitch, monitorTerminal);
+      setSwitchState(ui.monitorDiagnosticsSwitch, monitorDiagnostics);
+      ui.diagnosticsSeverity.value =
+        settings.diagnosticsSeverity === "warningAndError" ? "warningAndError" : "error";
       ui.cooldownMs.value = String(Math.max(500, settings.cooldownMs ?? 1500));
       ui.volumePercent.value = String(settings.volumePercent ?? 70);
       const patternMode = settings.patternMode === "append" ? "append" : "override";
@@ -494,6 +540,9 @@ function renderSettingsWebview(
         patternMode === "override" && Array.isArray(settings.patterns)
           ? settings.patterns.join("\\n")
           : "";
+      ui.excludePatterns.value = Array.isArray(settings.excludePatterns)
+        ? settings.excludePatterns.join("\\n")
+        : "";
       syncCooldownLabel();
       syncVolumeLabel();
     }
@@ -535,10 +584,18 @@ function renderSettingsWebview(
       const volumeRaw = Number(ui.volumePercent.value);
       return {
         enabled,
+        monitorTerminal,
+        monitorDiagnostics,
+        diagnosticsSeverity:
+          ui.diagnosticsSeverity.value === "warningAndError" ? "warningAndError" : "error",
         cooldownMs: Number.isFinite(cooldownRaw) ? Math.max(500, Math.round(cooldownRaw)) : 1500,
         volumePercent: Number.isFinite(volumeRaw) ? Math.min(100, Math.max(0, Math.round(volumeRaw))) : 70,
         patternMode: getPatternMode(),
         patterns: ui.patterns.value
+          .split(/\\r?\\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0),
+        excludePatterns: ui.excludePatterns.value
           .split(/\\r?\\n/)
           .map((line) => line.trim())
           .filter((line) => line.length > 0),
@@ -557,7 +614,15 @@ function renderSettingsWebview(
 
     ui.enabledSwitch.addEventListener("click", () => {
       enabled = !enabled;
-      ui.enabledSwitch.classList.toggle("on", enabled);
+      setSwitchState(ui.enabledSwitch, enabled);
+    });
+    ui.monitorTerminalSwitch.addEventListener("click", () => {
+      monitorTerminal = !monitorTerminal;
+      setSwitchState(ui.monitorTerminalSwitch, monitorTerminal);
+    });
+    ui.monitorDiagnosticsSwitch.addEventListener("click", () => {
+      monitorDiagnostics = !monitorDiagnostics;
+      setSwitchState(ui.monitorDiagnosticsSwitch, monitorDiagnostics);
     });
 
     ui.volumePercent.addEventListener("input", syncVolumeLabel);
@@ -582,8 +647,8 @@ function renderSettingsWebview(
     ui.resetBtn.addEventListener("click", () => {
       const resetSettings = {
         ...defaults,
-        patternMode: "override",
-        patterns: [],
+        patterns: Array.isArray(defaults.patterns) ? [...defaults.patterns] : [],
+        excludePatterns: Array.isArray(defaults.excludePatterns) ? [...defaults.excludePatterns] : [],
       };
       suppressNextSavedStatus = true;
       applySettings(resetSettings);
@@ -621,10 +686,11 @@ export function registerSettingsUiCommand(
   getStoredSettings: () => StoredSettings,
   onSaved: (settings: StoredSettings) => Promise<void>,
   onTest: (settings: StoredSettings) => void,
+  commandId = commandIds.openSettingsUi,
 ): vscode.Disposable {
   let panel: vscode.WebviewPanel | undefined;
 
-  return vscode.commands.registerCommand("terminalErrorSound.openSettingsUI", async () => {
+  return vscode.commands.registerCommand(commandId, async () => {
     if (panel) {
       panel.reveal(vscode.ViewColumn.One);
       panel.webview.html = renderSettingsWebview(panel.webview, context, getStoredSettings());

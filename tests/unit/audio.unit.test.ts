@@ -22,9 +22,13 @@ type ModuleMocks = {
 function createSettings(volumePercent: number): RuntimeSettings {
   return {
     enabled: true,
+    monitorTerminal: true,
+    monitorDiagnostics: true,
+    diagnosticsSeverity: "error",
     cooldownMs: 1500,
     volumePercent,
     patterns: [/error/i],
+    excludePatterns: [],
   };
 }
 

@@ -19,9 +19,15 @@ function createExecution(chunks: string[]): FakeExecution {
 function createSettings(overrides: Partial<RuntimeSettings> = {}): RuntimeSettings {
   return {
     enabled: true,
+    monitorTerminal: true,
+    monitorDiagnostics: true,
+    diagnosticsSeverity: "error",
     cooldownMs: 0,
     volumePercent: 70,
     patterns: [/error/i],
+    excludePatterns: [
+      /^\[[^\]]+\s[0-9a-f]{7,40}\]\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^)]+\))?!?:\s.+$/i,
+    ],
     ...overrides,
   };
 }
@@ -56,6 +62,20 @@ describe("execution monitor integration tests", () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
     const execution = createExecution(["error happened\n"]) as any;
     const settings = createSettings({ enabled: false });
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.mp3",
+    );
+
+    expect(playAlert).not.toHaveBeenCalled();
+  });
+
+  it("does not play when terminal source monitoring is disabled", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution(["error happened\n"]) as any;
+    const settings = createSettings({ monitorTerminal: false });
 
     await executionMonitor.monitorExecutionOutput(
       execution,

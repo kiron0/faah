@@ -9,9 +9,13 @@ type FakeUri = {
 function createSettings(overrides: Partial<RuntimeSettings> = {}): RuntimeSettings {
   return {
     enabled: true,
+    monitorTerminal: true,
+    monitorDiagnostics: true,
+    diagnosticsSeverity: "error",
     cooldownMs: 1000,
     volumePercent: 70,
     patterns: [/error/i],
+    excludePatterns: [],
     ...overrides,
   };
 }
@@ -103,5 +107,23 @@ describe("monitor coordination integration tests", () => {
 
     nowSpy.mockRestore();
   });
-});
 
+  it("prevents double playback when terminal and diagnostics fire in same cooldown window", async () => {
+    const harness = await loadMonitorHarness();
+    const settings = createSettings();
+    const activeKey = harness.activeUri.toString();
+
+    let now = 10_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+
+    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("new diagnostic error")]);
+    harness.executionMonitor.tryPlayForExecution({} as any, settings, "media/faah.mp3");
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.mp3",
+    );
+
+    expect(harness.playAlert).toHaveBeenCalledTimes(1);
+    nowSpy.mockRestore();
+  });
+});
