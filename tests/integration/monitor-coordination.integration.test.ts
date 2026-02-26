@@ -6,7 +6,9 @@ type FakeUri = {
   toString: () => string;
 };
 
-function createSettings(overrides: Partial<RuntimeSettings> = {}): RuntimeSettings {
+function createSettings(
+  overrides: Partial<RuntimeSettings> = {},
+): RuntimeSettings {
   return {
     enabled: true,
     monitorTerminal: true,
@@ -47,8 +49,13 @@ async function loadMonitorHarness() {
 
   const playAlert = vi.fn();
   const activeUri: FakeUri = { toString: () => "file:///active.ts" };
-  const diagnosticsByUri = new Map<string, ReturnType<typeof createDiagnostic>[]>();
-  const getDiagnostics = vi.fn((uri: FakeUri) => diagnosticsByUri.get(uri.toString()) ?? []);
+  const diagnosticsByUri = new Map<
+    string,
+    ReturnType<typeof createDiagnostic>[]
+  >();
+  const getDiagnostics = vi.fn(
+    (uri: FakeUri) => diagnosticsByUri.get(uri.toString()) ?? [],
+  );
 
   vi.doMock("vscode", () => ({
     window: {
@@ -87,21 +94,27 @@ describe("monitor coordination integration tests", () => {
     let now = 1000;
     const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
 
-    harness.executionMonitor.tryPlayForExecution({} as any, settings, "media/faah.mp3");
+    harness.executionMonitor.tryPlayForExecution(
+      {} as any,
+      settings,
+      "media/faah.wav",
+    );
     expect(harness.playAlert).toHaveBeenCalledTimes(1);
 
-    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("new diagnostic error")]);
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("new diagnostic error"),
+    ]);
     now = 1200;
     harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
     expect(harness.playAlert).toHaveBeenCalledTimes(1);
 
     now = 2500;
     harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
     expect(harness.playAlert).toHaveBeenCalledTimes(2);
 
@@ -116,11 +129,17 @@ describe("monitor coordination integration tests", () => {
     let now = 10_000;
     const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
 
-    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("new diagnostic error")]);
-    harness.executionMonitor.tryPlayForExecution({} as any, settings, "media/faah.mp3");
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("new diagnostic error"),
+    ]);
+    harness.executionMonitor.tryPlayForExecution(
+      {} as any,
+      settings,
+      "media/faah.wav",
+    );
     harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(harness.playAlert).toHaveBeenCalledTimes(1);

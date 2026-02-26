@@ -6,7 +6,9 @@ type FakeUri = {
   toString: () => string;
 };
 
-function createSettings(overrides: Partial<RuntimeSettings> = {}): RuntimeSettings {
+function createSettings(
+  overrides: Partial<RuntimeSettings> = {},
+): RuntimeSettings {
   return {
     enabled: true,
     monitorTerminal: true,
@@ -50,11 +52,16 @@ async function loadDiagnosticsMonitorHarness() {
   vi.resetModules();
 
   const playAlert = vi.fn();
-  const diagnosticsByUri = new Map<string, ReturnType<typeof createDiagnostic>[]>();
+  const diagnosticsByUri = new Map<
+    string,
+    ReturnType<typeof createDiagnostic>[]
+  >();
   const activeUri: FakeUri = { toString: () => "file:///active.ts" };
   const otherUri: FakeUri = { toString: () => "file:///other.ts" };
 
-  const getDiagnostics = vi.fn((uri: FakeUri) => diagnosticsByUri.get(uri.toString()) ?? []);
+  const getDiagnostics = vi.fn(
+    (uri: FakeUri) => diagnosticsByUri.get(uri.toString()) ?? [],
+  );
 
   vi.doMock("vscode", () => ({
     window: {
@@ -93,24 +100,28 @@ describe("diagnostics monitor integration tests", () => {
     const settings = createSettings();
     const activeKey = harness.activeUri.toString();
 
-    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("initial error")]);
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("initial error"),
+    ]);
 
     harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
     harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(harness.playAlert).toHaveBeenCalledTimes(1);
 
-    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("updated error", 0, 10)]);
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("updated error", 0, 10),
+    ]);
     harness.diagnosticsMonitor.onDiagnosticsChanged(
       { uris: [harness.activeUri] } as any,
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(harness.playAlert).toHaveBeenCalledTimes(2);
@@ -128,7 +139,7 @@ describe("diagnostics monitor integration tests", () => {
     harness.diagnosticsMonitor.onDiagnosticsChanged(
       { uris: [harness.otherUri] } as any,
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(harness.playAlert).not.toHaveBeenCalled();
@@ -139,11 +150,13 @@ describe("diagnostics monitor integration tests", () => {
     const settings = createSettings();
     const activeKey = harness.activeUri.toString();
 
-    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("warning only", 1)]);
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("warning only", 1),
+    ]);
 
     harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(harness.playAlert).not.toHaveBeenCalled();
@@ -154,11 +167,13 @@ describe("diagnostics monitor integration tests", () => {
     const settings = createSettings({ diagnosticsSeverity: "warningAndError" });
     const activeKey = harness.activeUri.toString();
 
-    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("warning only", 1)]);
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("warning only", 1),
+    ]);
 
     harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(harness.playAlert).toHaveBeenCalledTimes(1);
@@ -171,11 +186,13 @@ describe("diagnostics monitor integration tests", () => {
     });
     const activeKey = harness.activeUri.toString();
 
-    harness.diagnosticsByUri.set(activeKey, [createDiagnostic("Type 'undefined' is not assignable to type 'Item[]'.")]);
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("Type 'undefined' is not assignable to type 'Item[]'."),
+    ]);
 
     harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(harness.playAlert).not.toHaveBeenCalled();

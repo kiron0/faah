@@ -1,12 +1,12 @@
+import { ExecException, spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import * as vscode from "vscode";
-import { ExecException, spawn } from "child_process";
 import playSound from "play-sound";
+import * as vscode from "vscode";
 
 import type { RuntimeSettings } from "./settings";
 
-const fixedSoundFile = "faah.mp3";
+const fixedSoundFile = "faah.wav";
 const isWindows = process.platform === "win32";
 const isLinux = process.platform === "linux";
 const linuxPreferredPlayers = [
@@ -40,7 +40,9 @@ function clamp(value: number, min: number, max: number): number {
 function showMissingSoundFileWarning(): void {
   if (lastMissingSoundFileWarning === fixedSoundFile) return;
   lastMissingSoundFileWarning = fixedSoundFile;
-  vscode.window.showWarningMessage(`Faah could not find audio file: ${fixedSoundFile} in media/.`);
+  vscode.window.showWarningMessage(
+    `Faah could not find audio file: ${fixedSoundFile} in media/.`,
+  );
 }
 
 function warnWindowsFallbackOnce(message: string): void {
@@ -51,7 +53,10 @@ function warnWindowsFallbackOnce(message: string): void {
 
 function warnLinuxPlayerMissingOnce(errorText: string): void {
   if (!isLinux || hasWarnedLinuxMissingPlayer) return;
-  if (!errorText.toLowerCase().includes("couldn't find a suitable audio player")) return;
+  if (
+    !errorText.toLowerCase().includes("couldn't find a suitable audio player")
+  )
+    return;
 
   hasWarnedLinuxMissingPlayer = true;
   vscode.window.showWarningMessage(
@@ -89,7 +94,14 @@ function playWindowsBeepFallback(volumePercent: number): void {
   const script = `[console]::Beep(${frequency}, ${duration})`;
   const fallbackProcess = spawn(
     "powershell",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      script,
+    ],
     {
       stdio: "ignore",
       windowsHide: true,
@@ -108,7 +120,7 @@ function playOnWindows(soundPath: string, settings: RuntimeSettings): void {
     "$ErrorActionPreference = 'Stop'",
     "Add-Type -AssemblyName PresentationCore",
     `$path = '${escapedSoundPath}'`,
-    "if (-not (Test-Path -LiteralPath $path)) { throw \"Sound file not found\" }",
+    'if (-not (Test-Path -LiteralPath $path)) { throw "Sound file not found" }',
     "$player = New-Object System.Windows.Media.MediaPlayer",
     `$player.Volume = ${volumeRatio.toFixed(2)}`,
     "$player.Open([Uri]::new($path))",
@@ -126,7 +138,15 @@ function playOnWindows(soundPath: string, settings: RuntimeSettings): void {
 
   const playbackProcess = spawn(
     "powershell",
-    ["-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-Command", script],
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-STA",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      script,
+    ],
     {
       stdio: "ignore",
       windowsHide: true,
@@ -149,7 +169,10 @@ function playOnWindows(soundPath: string, settings: RuntimeSettings): void {
   });
 }
 
-function playUsingSystemPlayer(soundPath: string, settings: RuntimeSettings): void {
+function playUsingSystemPlayer(
+  soundPath: string,
+  settings: RuntimeSettings,
+): void {
   if (settings.volumePercent === 100) {
     playWithoutVolume(soundPath);
     return;
@@ -172,7 +195,9 @@ function playUsingSystemPlayer(soundPath: string, settings: RuntimeSettings): vo
   });
 }
 
-function buildCustomVolumeOptions(volumePercent: number): PlayMethodOptionsLoose {
+function buildCustomVolumeOptions(
+  volumePercent: number,
+): PlayMethodOptionsLoose {
   const ratio = clamp(volumePercent, 0, 100) / 100;
   return {
     afplay: ["-v", ratio],
@@ -183,7 +208,10 @@ function buildCustomVolumeOptions(volumePercent: number): PlayMethodOptionsLoose
   };
 }
 
-function playCustomFileWithVolume(soundPath: string, settings: RuntimeSettings): void {
+function playCustomFileWithVolume(
+  soundPath: string,
+  settings: RuntimeSettings,
+): void {
   if (isWindows) {
     playOnWindows(soundPath, settings);
     return;

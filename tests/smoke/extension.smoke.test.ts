@@ -8,12 +8,19 @@ type Harness = {
     subscriptions: Array<{ dispose: () => void }>;
   };
   getStartHandler: () => ((event: { execution: unknown }) => void) | undefined;
-  getEndHandler: () => ((event: { execution: unknown; exitCode?: number }) => void) | undefined;
+  getEndHandler: () =>
+    | ((event: { execution: unknown; exitCode?: number }) => void)
+    | undefined;
   getActiveEditorHandler: () => (() => void) | undefined;
   getTextDocumentHandler: () =>
-    | ((event: { document: { uri: { toString: () => string } }; contentChanges: unknown[] }) => void)
+    | ((event: {
+        document: { uri: { toString: () => string } };
+        contentChanges: unknown[];
+      }) => void)
     | undefined;
-  getDiagnosticsHandler: () => ((event: { uris: unknown[] }) => void) | undefined;
+  getDiagnosticsHandler: () =>
+    | ((event: { uris: unknown[] }) => void)
+    | undefined;
   commandHandlers: Map<string, () => void>;
   mocks: {
     monitorExecutionOutput: ReturnType<typeof vi.fn>;
@@ -56,7 +63,9 @@ function createRuntimeSettings(stored: StoredSettings): RuntimeSettings {
     cooldownMs: stored.cooldownMs,
     volumePercent: stored.volumePercent,
     patterns: [/error/i],
-    excludePatterns: [/^\[[^\]]+\s[0-9a-f]{7,40}\]\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^)]+\))?!?:\s.+$/i],
+    excludePatterns: [
+      /^\[[^\]]+\s[0-9a-f]{7,40}\]\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^)]+\))?!?:\s.+$/i,
+    ],
   };
 }
 
@@ -64,10 +73,15 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
   vi.resetModules();
 
   let startHandler: ((event: { execution: unknown }) => void) | undefined;
-  let endHandler: ((event: { execution: unknown; exitCode?: number }) => void) | undefined;
+  let endHandler:
+    | ((event: { execution: unknown; exitCode?: number }) => void)
+    | undefined;
   let activeEditorHandler: (() => void) | undefined;
   let textDocumentHandler:
-    | ((event: { document: { uri: { toString: () => string } }; contentChanges: unknown[] }) => void)
+    | ((event: {
+        document: { uri: { toString: () => string } };
+        contentChanges: unknown[];
+      }) => void)
     | undefined;
   let diagnosticsHandler: ((event: { uris: unknown[] }) => void) | undefined;
   const activeUri = { toString: () => "file:///active.ts" };
@@ -78,7 +92,7 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
   const onDiagnosticsChanged = vi.fn();
   const scanActiveEditorDiagnostics = vi.fn();
   const playAlert = vi.fn();
-  const resolveSoundPath = vi.fn(() => "media/faah.mp3");
+  const resolveSoundPath = vi.fn(() => "media/faah.wav");
   const registerSettingsUiCommand = vi.fn(() => ({ dispose: vi.fn() }));
   const executeCommand = vi.fn(async () => {});
 
@@ -87,7 +101,9 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
 
   const loadStoredSettings = vi.fn(() => storedSettings);
   const normalizeStoredSettings = vi.fn((next: StoredSettings) => next);
-  const toRuntimeSettings = vi.fn((stored: StoredSettings) => createRuntimeSettings(stored));
+  const toRuntimeSettings = vi.fn((stored: StoredSettings) =>
+    createRuntimeSettings(stored),
+  );
   const persistStoredSettings = vi.fn(async () => {});
 
   const startDisposable = { dispose: vi.fn() };
@@ -111,10 +127,12 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
       activeTextEditor: {
         document: { uri: activeUri },
       },
-      onDidStartTerminalShellExecution: vi.fn((cb: (event: { execution: unknown }) => void) => {
-        startHandler = cb;
-        return startDisposable;
-      }),
+      onDidStartTerminalShellExecution: vi.fn(
+        (cb: (event: { execution: unknown }) => void) => {
+          startHandler = cb;
+          return startDisposable;
+        },
+      ),
       onDidEndTerminalShellExecution: vi.fn(
         (cb: (event: { execution: unknown; exitCode?: number }) => void) => {
           endHandler = cb;
@@ -130,17 +148,24 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
     },
     workspace: {
       onDidChangeTextDocument: vi.fn(
-        (cb: (event: { document: { uri: { toString: () => string } }; contentChanges: unknown[] }) => void) => {
+        (
+          cb: (event: {
+            document: { uri: { toString: () => string } };
+            contentChanges: unknown[];
+          }) => void,
+        ) => {
           textDocumentHandler = cb;
           return { dispose: vi.fn() };
         },
       ),
     },
     languages: {
-      onDidChangeDiagnostics: vi.fn((cb: (event: { uris: unknown[] }) => void) => {
-        diagnosticsHandler = cb;
-        return diagnosticsDisposable;
-      }),
+      onDidChangeDiagnostics: vi.fn(
+        (cb: (event: { uris: unknown[] }) => void) => {
+          diagnosticsHandler = cb;
+          return diagnosticsDisposable;
+        },
+      ),
     },
     commands: {
       registerCommand: vi.fn((id: string, cb: () => void) => {
@@ -211,7 +236,7 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
     },
     storedSettings,
     runtimeSettings,
-    soundPath: "media/faah.mp3",
+    soundPath: "media/faah.wav",
   };
 }
 
@@ -290,10 +315,14 @@ describe("extension smoke tests", () => {
       diagnosticsHandler?.({ uris: [activeUri] });
 
       expect(harness.mocks.onDiagnosticsChanged).not.toHaveBeenCalled();
-      expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(1);
+      expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(
+        1,
+      );
 
       vi.runAllTimers();
-      expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(2);
+      expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(
+        2,
+      );
     } finally {
       vi.useRealTimers();
     }

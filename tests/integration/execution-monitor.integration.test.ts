@@ -16,7 +16,9 @@ function createExecution(chunks: string[]): FakeExecution {
   };
 }
 
-function createSettings(overrides: Partial<RuntimeSettings> = {}): RuntimeSettings {
+function createSettings(
+  overrides: Partial<RuntimeSettings> = {},
+): RuntimeSettings {
   return {
     enabled: true,
     monitorTerminal: true,
@@ -51,11 +53,11 @@ describe("execution monitor integration tests", () => {
     await executionMonitor.monitorExecutionOutput(
       execution,
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(playAlert).toHaveBeenCalledTimes(1);
-    expect(playAlert).toHaveBeenCalledWith(settings, "media/faah.mp3");
+    expect(playAlert).toHaveBeenCalledWith(settings, "media/faah.wav");
   });
 
   it("does not play alert when monitoring is disabled", async () => {
@@ -66,7 +68,7 @@ describe("execution monitor integration tests", () => {
     await executionMonitor.monitorExecutionOutput(
       execution,
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(playAlert).not.toHaveBeenCalled();
@@ -80,7 +82,7 @@ describe("execution monitor integration tests", () => {
     await executionMonitor.monitorExecutionOutput(
       execution,
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(playAlert).not.toHaveBeenCalled();
@@ -88,13 +90,15 @@ describe("execution monitor integration tests", () => {
 
   it("ignores benign commit summary lines that only contain the word error", async () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
-    const execution = createExecution(["[main abcdef1] feat: now handle active file error\n"]) as any;
+    const execution = createExecution([
+      "[main abcdef1] feat: now handle active file error\n",
+    ]) as any;
     const settings = createSettings();
 
     await executionMonitor.monitorExecutionOutput(
       execution,
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(playAlert).not.toHaveBeenCalled();
@@ -102,13 +106,15 @@ describe("execution monitor integration tests", () => {
 
   it("still plays for real terminal errors", async () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
-    const execution = createExecution(["error: command failed with exit code 1\n"]) as any;
+    const execution = createExecution([
+      "error: command failed with exit code 1\n",
+    ]) as any;
     const settings = createSettings();
 
     await executionMonitor.monitorExecutionOutput(
       execution,
       () => settings,
-      () => "media/faah.mp3",
+      () => "media/faah.wav",
     );
 
     expect(playAlert).toHaveBeenCalledTimes(1);
@@ -119,8 +125,8 @@ describe("execution monitor integration tests", () => {
     const execution = createExecution([]) as any;
     const settings = createSettings();
 
-    executionMonitor.tryPlayForExecution(execution, settings, "media/faah.mp3");
-    executionMonitor.tryPlayForExecution(execution, settings, "media/faah.mp3");
+    executionMonitor.tryPlayForExecution(execution, settings, "media/faah.wav");
+    executionMonitor.tryPlayForExecution(execution, settings, "media/faah.wav");
 
     expect(playAlert).toHaveBeenCalledTimes(1);
   });
@@ -136,12 +142,18 @@ describe("execution monitor integration tests", () => {
     const settings = createSettings();
 
     await expect(
-      executionMonitor.monitorExecutionOutput(execution, () => settings, () => "media/faah.mp3"),
+      executionMonitor.monitorExecutionOutput(
+        execution,
+        () => settings,
+        () => "media/faah.wav",
+      ),
     ).resolves.toBeUndefined();
 
     expect(playAlert).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to read terminal shell execution stream: stream failed"),
+      expect.stringContaining(
+        "Failed to read terminal shell execution stream: stream failed",
+      ),
     );
   });
 });

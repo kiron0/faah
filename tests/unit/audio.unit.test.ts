@@ -3,7 +3,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RuntimeSettings } from "../../src/settings";
 
-const originalPlatformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+const originalPlatformDescriptor = Object.getOwnPropertyDescriptor(
+  process,
+  "platform",
+);
 
 type LoadAudioOptions = {
   fileExists?: boolean;
@@ -36,7 +39,10 @@ function flushMicrotasks(): Promise<void> {
   return Promise.resolve();
 }
 
-async function loadAudio(platform: NodeJS.Platform, options: LoadAudioOptions = {}) {
+async function loadAudio(
+  platform: NodeJS.Platform,
+  options: LoadAudioOptions = {},
+) {
   vi.resetModules();
 
   Object.defineProperty(process, "platform", {
@@ -103,7 +109,7 @@ describe("audio unit tests", () => {
   it("uses play-sound on macOS", async () => {
     const { audio, mocks } = await loadAudio("darwin");
 
-    audio.playAlert(createSettings(100), "media/faah.mp3");
+    audio.playAlert(createSettings(100), "media/faah.wav");
 
     expect(mocks.play).toHaveBeenCalledTimes(1);
     expect(mocks.spawn).not.toHaveBeenCalled();
@@ -114,25 +120,32 @@ describe("audio unit tests", () => {
   it("uses play-sound volume options on Linux", async () => {
     const { audio, mocks } = await loadAudio("linux");
 
-    audio.playAlert(createSettings(40), "media/faah.mp3");
+    audio.playAlert(createSettings(40), "media/faah.wav");
 
     expect(mocks.play).toHaveBeenCalledTimes(1);
     const call = mocks.play.mock.calls[0];
-    expect(call[0]).toBe("media/faah.mp3");
+    expect(call[0]).toBe("media/faah.wav");
     expect(call[1]).toMatchObject({
       afplay: ["-v", 0.4],
       mplayer: ["-volume", 40],
       play: ["vol", 0.4],
     });
     expect(mocks.playSoundFactory).toHaveBeenCalledWith({
-      players: expect.arrayContaining(["paplay", "ffplay", "mpv", "cvlc", "mplayer", "mpg123"]),
+      players: expect.arrayContaining([
+        "paplay",
+        "ffplay",
+        "mpv",
+        "cvlc",
+        "mplayer",
+        "mpg123",
+      ]),
     });
   });
 
   it("uses hidden PowerShell inline playback on Windows", async () => {
     const { audio, mocks } = await loadAudio("win32");
 
-    audio.playAlert(createSettings(70), "media/faah.mp3");
+    audio.playAlert(createSettings(70), "media/faah.wav");
 
     expect(mocks.spawn).toHaveBeenCalledTimes(1);
     expect(mocks.play).not.toHaveBeenCalled();
@@ -147,7 +160,7 @@ describe("audio unit tests", () => {
   it("warns and skips playback when the sound file is missing", async () => {
     const { audio, mocks } = await loadAudio("linux", { fileExists: false });
 
-    audio.playAlert(createSettings(70), "media/faah.mp3");
+    audio.playAlert(createSettings(70), "media/faah.wav");
 
     expect(mocks.showWarningMessage).toHaveBeenCalledTimes(1);
     expect(mocks.play).not.toHaveBeenCalled();
@@ -159,16 +172,20 @@ describe("audio unit tests", () => {
       playError: new Error("Couldn't find a suitable audio player"),
     });
 
-    audio.playAlert(createSettings(70), "media/faah.mp3");
+    audio.playAlert(createSettings(70), "media/faah.wav");
 
     expect(mocks.showWarningMessage).toHaveBeenCalledTimes(1);
-    expect(mocks.showWarningMessage.mock.calls[0][0]).toContain("Install one of");
+    expect(mocks.showWarningMessage.mock.calls[0][0]).toContain(
+      "Install one of",
+    );
   });
 
   it("falls back to console beep if Windows inline player exits with non-zero code", async () => {
-    const { audio, mocks } = await loadAudio("win32", { spawnCloseCodes: [1, 0] });
+    const { audio, mocks } = await loadAudio("win32", {
+      spawnCloseCodes: [1, 0],
+    });
 
-    audio.playAlert(createSettings(70), "media/faah.mp3");
+    audio.playAlert(createSettings(70), "media/faah.wav");
     await flushMicrotasks();
 
     expect(mocks.spawn).toHaveBeenCalledTimes(2);
