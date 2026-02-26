@@ -29,7 +29,13 @@ function createSettings(volumePercent: number): RuntimeSettings {
     monitorDiagnostics: true,
     diagnosticsSeverity: "error",
     cooldownMs: 1500,
+    terminalCooldownMs: 1500,
+    diagnosticsCooldownMs: 1500,
     volumePercent,
+    customSoundPath: "",
+    quietHoursEnabled: false,
+    quietHoursStart: "22:00",
+    quietHoursEnd: "07:00",
     patterns: [/error/i],
     excludePatterns: [],
   };

@@ -4,7 +4,7 @@ import * as path from "path";
 import playSound from "play-sound";
 import * as vscode from "vscode";
 
-import type { RuntimeSettings } from "./settings";
+import type { RuntimeSettings, StoredSettings } from "./settings";
 
 const fixedSoundFile = "faah.wav";
 const isWindows = process.platform === "win32";
@@ -27,7 +27,8 @@ const player = playSound(
 let hasWarnedVolumeFallback = false;
 let hasWarnedWindowsFallback = false;
 let hasWarnedLinuxMissingPlayer = false;
-let lastMissingSoundFileWarning: string | null = null;
+let lastMissingSoundWarningPath: string | null = null;
+let lastInvalidCustomSoundWarningPath: string | null = null;
 
 type PlayMethodOptionsLoose = Record<string, Array<string | number>> & {
   timeout?: number;
@@ -37,11 +38,30 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function showMissingSoundFileWarning(): void {
-  if (lastMissingSoundFileWarning === fixedSoundFile) return;
-  lastMissingSoundFileWarning = fixedSoundFile;
+function showMissingSoundFileWarning(soundPath: string): void {
+  if (lastMissingSoundWarningPath === soundPath) return;
+  lastMissingSoundWarningPath = soundPath;
+
+  if (path.basename(soundPath) === fixedSoundFile) {
+    vscode.window.showWarningMessage(
+      `Faah could not find audio file: ${fixedSoundFile} in media/.`,
+    );
+    return;
+  }
+
   vscode.window.showWarningMessage(
-    `Faah could not find audio file: ${fixedSoundFile} in media/.`,
+    `Faah could not find audio file at: ${soundPath}`,
+  );
+}
+
+function showInvalidCustomSoundFallbackWarning(
+  rawCustomSoundPath: string,
+  resolvedCustomSoundPath: string,
+): void {
+  if (lastInvalidCustomSoundWarningPath === resolvedCustomSoundPath) return;
+  lastInvalidCustomSoundWarningPath = resolvedCustomSoundPath;
+  vscode.window.showWarningMessage(
+    `Faah custom sound not found: ${rawCustomSoundPath}. Using default ${fixedSoundFile}.`,
   );
 }
 
@@ -64,13 +84,43 @@ function warnLinuxPlayerMissingOnce(errorText: string): void {
   );
 }
 
-export function resolveSoundPath(context: vscode.ExtensionContext): string {
-  const soundPath = context.asAbsolutePath(path.join("media", fixedSoundFile));
-  if (!fs.existsSync(soundPath)) {
-    showMissingSoundFileWarning();
+function resolveCustomSoundPath(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return "";
+
+  const withExpandedHome =
+    trimmed === "~"
+      ? process.env.HOME ?? trimmed
+      : trimmed.startsWith("~/")
+        ? path.join(process.env.HOME ?? "~", trimmed.slice(2))
+        : trimmed;
+
+  if (path.isAbsolute(withExpandedHome)) return withExpandedHome;
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (workspaceRoot) return path.resolve(workspaceRoot, withExpandedHome);
+  return path.resolve(withExpandedHome);
+}
+
+export function resolveSoundPath(
+  context: vscode.ExtensionContext,
+  settings?: Pick<StoredSettings, "customSoundPath">,
+): string {
+  const defaultSoundPath = context.asAbsolutePath(path.join("media", fixedSoundFile));
+  const rawCustomSoundPath = settings?.customSoundPath?.trim() ?? "";
+  if (rawCustomSoundPath.length > 0) {
+    const resolvedCustomSoundPath = resolveCustomSoundPath(rawCustomSoundPath);
+    if (resolvedCustomSoundPath && fs.existsSync(resolvedCustomSoundPath)) {
+      return resolvedCustomSoundPath;
+    }
+
+    showInvalidCustomSoundFallbackWarning(rawCustomSoundPath, resolvedCustomSoundPath);
   }
 
-  return soundPath;
+  if (!fs.existsSync(defaultSoundPath)) {
+    showMissingSoundFileWarning(defaultSoundPath);
+  }
+
+  return defaultSoundPath;
 }
 
 function playWithoutVolume(soundPath: string): void {
@@ -222,7 +272,7 @@ function playCustomFileWithVolume(
 
 export function playAlert(settings: RuntimeSettings, soundPath: string): void {
   if (!fs.existsSync(soundPath)) {
-    showMissingSoundFileWarning();
+    showMissingSoundFileWarning(soundPath);
     return;
   }
 

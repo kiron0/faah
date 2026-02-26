@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-import { tryAcquirePlaybackWindow } from "./alert-gate";
+import { getAlertSuppressionReason, tryAcquirePlaybackWindow } from "./alert-gate";
 import { playAlert } from "./audio";
 import type { RuntimeSettings } from "./settings";
 
@@ -52,8 +52,9 @@ export function tryPlayForExecution(
   soundPath: string,
 ): void {
   if (!settings.monitorTerminal) return;
+  if (getAlertSuppressionReason(settings) !== null) return;
   if (playedByExecution.has(execution)) return;
-  if (!tryAcquirePlaybackWindow(settings.cooldownMs)) return;
+  if (!tryAcquirePlaybackWindow(settings.terminalCooldownMs, "terminal")) return;
 
   playedByExecution.add(execution);
   playAlert(settings, soundPath);

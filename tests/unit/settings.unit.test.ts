@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-async function loadSettingsModule() {
+async function loadSettingsModuleWithVscode(vscodeMock: unknown) {
   vi.resetModules();
-  vi.doMock("vscode", () => ({}));
+  vi.doMock("vscode", () => vscodeMock);
   return import("../../src/settings");
+}
+
+async function loadSettingsModule() {
+  return loadSettingsModuleWithVscode({});
 }
 
 describe("settings unit tests", () => {
@@ -25,6 +29,7 @@ describe("settings unit tests", () => {
       diagnosticsSeverity: "warningAndError",
       cooldownMs: 100,
       volumePercent: 999,
+      customSoundPath: "   ./sounds/custom.wav   ",
       patternMode: "append",
       patterns: ["   custom.*error   ", "   ", "", "panic"],
       excludePatterns: ["  ^ignore this$  ", "   "],
@@ -36,6 +41,7 @@ describe("settings unit tests", () => {
     expect(normalized.diagnosticsSeverity).toBe("warningAndError");
     expect(normalized.cooldownMs).toBe(500);
     expect(normalized.volumePercent).toBe(100);
+    expect(normalized.customSoundPath).toBe("./sounds/custom.wav");
     expect(normalized.patternMode).toBe("append");
     expect(normalized.patterns).toEqual(["custom.*error", "panic"]);
     expect(normalized.excludePatterns).toEqual(["^ignore this$"]);
@@ -87,5 +93,52 @@ describe("settings unit tests", () => {
 
     expect(runtime.patterns.length).toBe(settings.defaultStoredSettings.patterns.length);
     expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists to global settings by default even when a workspace is open", async () => {
+    const configUpdate = vi.fn().mockResolvedValue(undefined);
+    const globalStateUpdate = vi.fn().mockResolvedValue(undefined);
+    const settings = await loadSettingsModuleWithVscode({
+      workspace: {
+        workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
+        getConfiguration: vi.fn(() => ({ update: configUpdate })),
+      },
+      ConfigurationTarget: {
+        Global: "global",
+        Workspace: "workspace",
+      },
+    });
+
+    await settings.persistStoredSettings(
+      { globalState: { update: globalStateUpdate } } as any,
+      settings.defaultStoredSettings,
+    );
+
+    expect(configUpdate).toHaveBeenCalled();
+    expect(configUpdate.mock.calls.every((call) => call[2] === "global")).toBe(true);
+    expect(globalStateUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists to workspace settings only when workspace target is explicitly requested", async () => {
+    const configUpdate = vi.fn().mockResolvedValue(undefined);
+    const settings = await loadSettingsModuleWithVscode({
+      workspace: {
+        workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
+        getConfiguration: vi.fn(() => ({ update: configUpdate })),
+      },
+      ConfigurationTarget: {
+        Global: "global",
+        Workspace: "workspace",
+      },
+    });
+
+    await settings.persistStoredSettings(
+      { globalState: { update: vi.fn().mockResolvedValue(undefined) } } as any,
+      settings.defaultStoredSettings,
+      "workspace",
+    );
+
+    expect(configUpdate).toHaveBeenCalled();
+    expect(configUpdate.mock.calls.every((call) => call[2] === "workspace")).toBe(true);
   });
 });

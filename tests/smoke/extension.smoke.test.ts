@@ -45,8 +45,14 @@ function createStoredSettings(enabled: boolean): StoredSettings {
     monitorDiagnostics: true,
     diagnosticsSeverity: "error",
     cooldownMs: 1500,
+    terminalCooldownMs: 1500,
+    diagnosticsCooldownMs: 1500,
     patternMode: "override",
     volumePercent: 70,
+    customSoundPath: "",
+    quietHoursEnabled: false,
+    quietHoursStart: "22:00",
+    quietHoursEnd: "07:00",
     patterns: ["\\berror\\b"],
     excludePatterns: [
       "^\\[[^\\]]+\\s[0-9a-f]{7,40}\\]\\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\([^)]+\\))?!?:\\s.+$",
@@ -61,7 +67,13 @@ function createRuntimeSettings(stored: StoredSettings): RuntimeSettings {
     monitorDiagnostics: stored.monitorDiagnostics,
     diagnosticsSeverity: stored.diagnosticsSeverity,
     cooldownMs: stored.cooldownMs,
+    terminalCooldownMs: stored.terminalCooldownMs,
+    diagnosticsCooldownMs: stored.diagnosticsCooldownMs,
     volumePercent: stored.volumePercent,
+    customSoundPath: stored.customSoundPath,
+    quietHoursEnabled: stored.quietHoursEnabled,
+    quietHoursStart: stored.quietHoursStart,
+    quietHoursEnd: stored.quietHoursEnd,
     patterns: [/error/i],
     excludePatterns: [
       /^\[[^\]]+\s[0-9a-f]{7,40}\]\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^)]+\))?!?:\s.+$/i,
@@ -145,6 +157,8 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
       }),
       createStatusBarItem: vi.fn(() => statusBarItem),
       showQuickPick: vi.fn(async () => undefined),
+      showInformationMessage: vi.fn(async () => undefined),
+      showInputBox: vi.fn(async () => undefined),
     },
     workspace: {
       onDidChangeTextDocument: vi.fn(
@@ -158,6 +172,7 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
           return { dispose: vi.fn() };
         },
       ),
+      onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
     },
     languages: {
       onDidChangeDiagnostics: vi.fn(
@@ -190,6 +205,7 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
   vi.doMock("../../src/diagnostics-monitor", () => ({
     onDiagnosticsChanged,
     scanActiveEditorDiagnostics,
+    disposeDiagnosticsMonitorState: vi.fn(),
   }));
   vi.doMock("../../src/settings-webview", () => ({
     registerSettingsUiCommand: registerSettingsUiCommand.mockImplementation(
@@ -250,7 +266,7 @@ describe("extension smoke tests", () => {
     const textDocumentHandler = harness.getTextDocumentHandler();
     const diagnosticsHandler = harness.getDiagnosticsHandler();
 
-    expect(harness.context.subscriptions).toHaveLength(10);
+    expect(harness.context.subscriptions).toHaveLength(16);
     expect(startHandler).toBeTypeOf("function");
     expect(endHandler).toBeTypeOf("function");
     expect(activeEditorHandler).toBeTypeOf("function");
@@ -258,6 +274,10 @@ describe("extension smoke tests", () => {
     expect(diagnosticsHandler).toBeTypeOf("function");
     expect(harness.commandHandlers.has("faah.playTestSound")).toBe(true);
     expect(harness.commandHandlers.has("faah.showQuickActions")).toBe(true);
+    expect(harness.commandHandlers.has("faah.openSettingsUI")).toBe(false);
+    expect(harness.commandHandlers.has("faah.snoozeAlerts")).toBe(true);
+    expect(harness.commandHandlers.has("faah.clearSnooze")).toBe(true);
+    expect(harness.commandHandlers.has("faah.setQuietHours")).toBe(true);
     expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(1);
 
     const execution = {};

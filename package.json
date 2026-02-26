@@ -3,7 +3,7 @@
   "displayName": "Faah",
   "description": "When errors get dramatic, Faah gets louder.",
   "icon": "images/icon.png",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {
@@ -27,8 +27,180 @@
         "command": "faah.showQuickActions",
         "title": "Show Quick Actions",
         "category": "Faah"
+      },
+      {
+        "command": "faah.openSettingsUI",
+        "title": "Open Settings",
+        "category": "Faah"
+      },
+      {
+        "command": "faah.playTestSound",
+        "title": "Play Test Sound",
+        "category": "Faah"
+      },
+      {
+        "command": "faah.snoozeAlerts",
+        "title": "Snooze Alerts",
+        "category": "Faah"
+      },
+      {
+        "command": "faah.clearSnooze",
+        "title": "Clear Snooze",
+        "category": "Faah"
+      },
+      {
+        "command": "faah.setQuietHours",
+        "title": "Set Quiet Hours",
+        "category": "Faah"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Faah",
+      "properties": {
+        "faah.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Enable or disable Faah monitoring."
+        },
+        "faah.monitorTerminal": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Monitor terminal command output for errors."
+        },
+        "faah.monitorDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Monitor active-editor diagnostics."
+        },
+        "faah.diagnosticsSeverity": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warningAndError"
+          ],
+          "default": "error",
+          "scope": "resource",
+          "description": "Diagnostic severities that can trigger Faah."
+        },
+        "faah.cooldownMs": {
+          "type": "number",
+          "default": 1500,
+          "minimum": 500,
+          "scope": "resource",
+          "description": "Minimum delay between two alerts in milliseconds."
+        },
+        "faah.terminalCooldownMs": {
+          "type": "number",
+          "default": 1500,
+          "minimum": 500,
+          "scope": "resource",
+          "description": "Minimum delay between terminal-triggered alerts in milliseconds."
+        },
+        "faah.diagnosticsCooldownMs": {
+          "type": "number",
+          "default": 1500,
+          "minimum": 500,
+          "scope": "resource",
+          "description": "Minimum delay between diagnostics-triggered alerts in milliseconds."
+        },
+        "faah.patternMode": {
+          "type": "string",
+          "enum": [
+            "override",
+            "append"
+          ],
+          "default": "override",
+          "scope": "resource",
+          "description": "Override uses only custom patterns. Append keeps built-ins and adds custom patterns."
+        },
+        "faah.volumePercent": {
+          "type": "number",
+          "default": 70,
+          "minimum": 0,
+          "maximum": 100,
+          "scope": "resource",
+          "description": "Playback volume percentage."
+        },
+        "faah.customSoundPath": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Optional custom sound file path selected in Settings UI. Empty means use bundled faah."
+        },
+        "faah.quietHoursEnabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Suppress alerts during quiet hours."
+        },
+        "faah.quietHoursStart": {
+          "type": "string",
+          "default": "22:00",
+          "pattern": "^([01]\\\\d|2[0-3]):([0-5]\\\\d)$",
+          "scope": "resource",
+          "description": "Quiet hours start time in 24h HH:mm format."
+        },
+        "faah.quietHoursEnd": {
+          "type": "string",
+          "default": "07:00",
+          "pattern": "^([01]\\\\d|2[0-3]):([0-5]\\\\d)$",
+          "scope": "resource",
+          "description": "Quiet hours end time in 24h HH:mm format."
+        },
+        "faah.patterns": {
+          "type": "array",
+          "scope": "resource",
+          "description": "Regex patterns that detect terminal errors (one regex per entry).",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "\\\\berror\\\\b",
+            "\\\\bfailed\\\\b",
+            "\\\\bfailure\\\\b",
+            "\\\\bfatal\\\\b",
+            "\\\\bexception\\\\b",
+            "\\\\bcritical\\\\b",
+            "\\\\berr(or)?[:!\\\\]]",
+            "\\\\buncaught\\\\b",
+            "UnhandledPromiseRejection",
+            "Traceback \\\\(most recent call last\\\\):",
+            "\\\\bsyntaxerror\\\\b",
+            "\\\\btypeerror\\\\b",
+            "\\\\breferenceerror\\\\b",
+            "\\\\brangeerror\\\\b",
+            "\\\\bmodule\\\\s+not\\\\s+found\\\\b",
+            "\\\\bcannot\\\\s+find\\\\s+module\\\\b",
+            "\\\\bno\\\\s+module\\\\s+named\\\\b",
+            "\\\\bsegmentation\\\\s+fault\\\\b",
+            "\\\\bcore\\\\s+dumped\\\\b",
+            "\\\\bpanic:|\\\\bpanicked\\\\s+at\\\\b",
+            "^\\\\s*caused\\\\s+by:",
+            "\\\\bpermission\\\\s+denied\\\\b",
+            "\\\\baccess\\\\s+denied\\\\b",
+            "\\\\bcommand\\\\s+not\\\\s+found\\\\b",
+            "\\\\btimeout(?:\\\\s+exceeded)?\\\\b",
+            "\\\\bconnection\\\\s+(?:refused|reset|timed\\\\s*out)\\\\b",
+            "\\\\bhttp\\\\s+5\\\\d\\\\d\\\\b"
+          ]
+        },
+        "faah.excludePatterns": {
+          "type": "array",
+          "scope": "resource",
+          "description": "Regex patterns to suppress false positives.",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "^\\\\[[^\\\\]]+\\\\s[0-9a-f]{7,40}\\\\]\\\\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\\\([^)]+\\\\))?!?:\\\\s.+$",
+            "^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\\\([^)]+\\\\))?!?:\\\\s.+$"
+          ]
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",

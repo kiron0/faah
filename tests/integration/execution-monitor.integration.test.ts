@@ -25,7 +25,13 @@ function createSettings(
     monitorDiagnostics: true,
     diagnosticsSeverity: "error",
     cooldownMs: 0,
+    terminalCooldownMs: 0,
+    diagnosticsCooldownMs: 0,
     volumePercent: 70,
+    customSoundPath: "",
+    quietHoursEnabled: false,
+    quietHoursStart: "22:00",
+    quietHoursEnd: "07:00",
     patterns: [/error/i],
     excludePatterns: [
       /^\[[^\]]+\s[0-9a-f]{7,40}\]\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^)]+\))?!?:\s.+$/i,

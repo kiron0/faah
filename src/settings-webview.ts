@@ -4,6 +4,7 @@ import { commandIds } from "./commands";
 import {
   defaultStoredSettings,
   normalizeStoredSettings,
+  type SettingsPersistTarget,
   type StoredSettings,
 } from "./settings";
 
@@ -20,6 +21,7 @@ function renderSettingsWebview(
   webview: vscode.Webview,
   context: vscode.ExtensionContext,
   settings: StoredSettings,
+  hasWorkspace: boolean,
 ): string {
   const nonce = getNonce();
   const iconUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, "images", "icon.png"));
@@ -286,8 +288,78 @@ function renderSettingsWebview(
       margin-top: 12px;
     }
 
+    .time-range {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .time-separator {
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .validation-summary {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .validation-summary.ok {
+      color: #8ef2d8;
+    }
+
+    .validation-summary.error {
+      color: #ffd6d6;
+    }
+
+    .validation-list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: #ffd6d6;
+      font-size: 0.82rem;
+      line-height: 1.35;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .validation-list li + li {
+      margin-top: 5px;
+    }
+
+    .validation-list code {
+      color: #ffd6d6;
+      background: transparent;
+      font-size: 0.8rem;
+    }
+
     .hidden {
       display: none;
+    }
+
+    .path-display {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(5, 13, 24, 0.82);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 11px;
+      font: inherit;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      line-height: 1.3;
+      word-break: break-all;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
     }
 
     .actions {
@@ -383,7 +455,7 @@ function renderSettingsWebview(
           <p>Tune your alert behavior without opening VS Code settings.</p>
         </div>
       </div>
-      <div class="pill">All changes are saved instantly for this extension</div>
+      <div class="pill">Click Save Changes to persist updates</div>
     </section>
 
     <section class="grid">
@@ -421,12 +493,21 @@ function renderSettingsWebview(
       </article>
 
       <article class="card">
-        <label for="cooldownMs">Cooldown (ms)</label>
+        <label for="terminalCooldownMs">Terminal Cooldown (ms)</label>
         <div class="volume-row">
-          <input id="cooldownMs" type="range" min="500" max="10000" step="100" />
-          <div id="cooldownLabel" class="value-badge">1500ms</div>
+          <input id="terminalCooldownMs" type="range" min="500" max="10000" step="100" />
+          <div id="terminalCooldownLabel" class="value-badge">1500ms</div>
         </div>
-        <div class="hint">Minimum delay between two alerts (minimum 500ms).</div>
+        <div class="hint">Delay between terminal-triggered alerts (minimum 500ms).</div>
+      </article>
+
+      <article class="card">
+        <label for="diagnosticsCooldownMs">Diagnostics Cooldown (ms)</label>
+        <div class="volume-row">
+          <input id="diagnosticsCooldownMs" type="range" min="500" max="10000" step="100" />
+          <div id="diagnosticsCooldownLabel" class="value-badge">1500ms</div>
+        </div>
+        <div class="hint">Delay between diagnostics-triggered alerts (minimum 500ms).</div>
       </article>
 
       <article class="card">
@@ -436,6 +517,48 @@ function renderSettingsWebview(
           <div id="volumeLabel" class="value-badge">70%</div>
         </div>
         <div class="hint">0% is mute and 100% is max.</div>
+      </article>
+
+      <article class="card">
+        <label for="saveTarget">Save Scope</label>
+        <select id="saveTarget" aria-label="Save scope">
+          <option value="global" selected>User (Global)</option>
+          ${hasWorkspace ? '<option value="workspace">Workspace</option>' : ""}
+        </select>
+        <div class="hint">
+          ${
+            hasWorkspace
+              ? "Choose where settings are stored when you click Save Changes."
+              : "No workspace open. Settings will be saved to user settings."
+          }
+        </div>
+      </article>
+
+      <article class="card">
+        <label>Quiet Hours</label>
+        <div class="row">
+          <div>
+            <div>Suppress alerts during selected hours.</div>
+            <div class="hint">Use 24-hour time format.</div>
+          </div>
+          <button id="quietHoursSwitch" class="switch" type="button" aria-label="Toggle quiet hours"><span></span></button>
+        </div>
+        <div class="time-range">
+          <input id="quietHoursStart" type="time" step="60" aria-label="Quiet hours start" />
+          <span class="time-separator">to</span>
+          <input id="quietHoursEnd" type="time" step="60" aria-label="Quiet hours end" />
+        </div>
+      </article>
+
+      <article class="card">
+        <label>Custom Sound (optional)</label>
+        <div id="customSoundPathDisplay" class="path-display" role="status" aria-live="polite"></div>
+        <div class="hint">Upload/select a sound file to override default playback.</div>
+        <div class="hint">Use default to return to bundled <code>faah</code>.</div>
+        <div class="button-row">
+          <button class="secondary" id="uploadSoundBtn" type="button">Upload Sound File</button>
+          <button class="secondary" id="useDefaultSoundBtn" type="button">Use Default (faah)</button>
+        </div>
       </article>
 
       <article class="card full">
@@ -468,6 +591,13 @@ function renderSettingsWebview(
         <textarea id="excludePatterns" spellcheck="false"></textarea>
         <div class="hint">Lines or diagnostics matching these regexes are ignored to reduce false positives.</div>
       </article>
+
+      <article class="card full">
+        <label>Regex Validation Preview</label>
+        <p id="regexValidationSummary" class="validation-summary">No patterns to validate yet.</p>
+        <ul id="invalidPatternList" class="validation-list hidden" aria-label="Invalid custom patterns"></ul>
+        <ul id="invalidExcludePatternList" class="validation-list hidden" aria-label="Invalid exclude patterns"></ul>
+      </article>
     </section>
 
     <section class="actions">
@@ -487,22 +617,35 @@ function renderSettingsWebview(
     const vscode = acquireVsCodeApi();
     const defaults = ${JSON.stringify(defaultStoredSettings).replace(/</g, "\\u003c")};
     const initial = ${bootSettings};
+    const hasWorkspace = ${JSON.stringify(hasWorkspace)};
 
     const ui = {
       enabledSwitch: document.getElementById("enabledSwitch"),
       monitorTerminalSwitch: document.getElementById("monitorTerminalSwitch"),
       monitorDiagnosticsSwitch: document.getElementById("monitorDiagnosticsSwitch"),
       diagnosticsSeverity: document.getElementById("diagnosticsSeverity"),
-      cooldownMs: document.getElementById("cooldownMs"),
-      cooldownLabel: document.getElementById("cooldownLabel"),
+      terminalCooldownMs: document.getElementById("terminalCooldownMs"),
+      terminalCooldownLabel: document.getElementById("terminalCooldownLabel"),
+      diagnosticsCooldownMs: document.getElementById("diagnosticsCooldownMs"),
+      diagnosticsCooldownLabel: document.getElementById("diagnosticsCooldownLabel"),
       volumePercent: document.getElementById("volumePercent"),
       volumeLabel: document.getElementById("volumeLabel"),
+      customSoundPathDisplay: document.getElementById("customSoundPathDisplay"),
+      uploadSoundBtn: document.getElementById("uploadSoundBtn"),
+      useDefaultSoundBtn: document.getElementById("useDefaultSoundBtn"),
+      quietHoursSwitch: document.getElementById("quietHoursSwitch"),
+      quietHoursStart: document.getElementById("quietHoursStart"),
+      quietHoursEnd: document.getElementById("quietHoursEnd"),
       patternModeOverride: document.getElementById("patternModeOverride"),
       patternModeAppend: document.getElementById("patternModeAppend"),
       patterns: document.getElementById("patterns"),
       excludePatterns: document.getElementById("excludePatterns"),
+      regexValidationSummary: document.getElementById("regexValidationSummary"),
+      invalidPatternList: document.getElementById("invalidPatternList"),
+      invalidExcludePatternList: document.getElementById("invalidExcludePatternList"),
       appendReadonlyWrap: document.getElementById("appendReadonlyWrap"),
       builtInPatternsList: document.getElementById("builtInPatternsList"),
+      saveTarget: document.getElementById("saveTarget"),
       saveBtn: document.getElementById("saveBtn"),
       testBtn: document.getElementById("testBtn"),
       resetBtn: document.getElementById("resetBtn"),
@@ -512,6 +655,8 @@ function renderSettingsWebview(
     let enabled = true;
     let monitorTerminal = true;
     let monitorDiagnostics = true;
+    let customSoundPath = "";
+    let quietHoursEnabled = false;
     let statusTimer = null;
     let suppressNextSavedStatus = false;
 
@@ -519,32 +664,60 @@ function renderSettingsWebview(
       element.classList.toggle("on", isOn);
     }
 
-    function syncCooldownLabel() {
-      ui.cooldownLabel.textContent = ui.cooldownMs.value + "ms";
+    function syncTerminalCooldownLabel() {
+      ui.terminalCooldownLabel.textContent = ui.terminalCooldownMs.value + "ms";
+    }
+
+    function syncDiagnosticsCooldownLabel() {
+      ui.diagnosticsCooldownLabel.textContent = ui.diagnosticsCooldownMs.value + "ms";
+    }
+
+    function syncCustomSoundDisplay() {
+      if (!customSoundPath) {
+        ui.customSoundPathDisplay.textContent = "Using default: faah";
+        return;
+      }
+
+      ui.customSoundPathDisplay.textContent = customSoundPath;
     }
 
     function applySettings(settings) {
       enabled = !!settings.enabled;
       monitorTerminal = !!settings.monitorTerminal;
       monitorDiagnostics = !!settings.monitorDiagnostics;
+      quietHoursEnabled = !!settings.quietHoursEnabled;
       setSwitchState(ui.enabledSwitch, enabled);
       setSwitchState(ui.monitorTerminalSwitch, monitorTerminal);
       setSwitchState(ui.monitorDiagnosticsSwitch, monitorDiagnostics);
+      setSwitchState(ui.quietHoursSwitch, quietHoursEnabled);
       ui.diagnosticsSeverity.value =
         settings.diagnosticsSeverity === "warningAndError" ? "warningAndError" : "error";
-      ui.cooldownMs.value = String(Math.max(500, settings.cooldownMs ?? 1500));
+      ui.terminalCooldownMs.value = String(
+        Math.max(500, settings.terminalCooldownMs ?? settings.cooldownMs ?? 1500),
+      );
+      ui.diagnosticsCooldownMs.value = String(
+        Math.max(500, settings.diagnosticsCooldownMs ?? settings.cooldownMs ?? 1500),
+      );
       ui.volumePercent.value = String(settings.volumePercent ?? 70);
+      customSoundPath = typeof settings.customSoundPath === "string" ? settings.customSoundPath : "";
+      syncCustomSoundDisplay();
+      ui.quietHoursStart.value =
+        typeof settings.quietHoursStart === "string" ? settings.quietHoursStart : "22:00";
+      ui.quietHoursEnd.value =
+        typeof settings.quietHoursEnd === "string" ? settings.quietHoursEnd : "07:00";
       const patternMode = settings.patternMode === "append" ? "append" : "override";
-      setPatternMode(patternMode, false);
+      setPatternMode(patternMode);
       ui.patterns.value =
-        patternMode === "override" && Array.isArray(settings.patterns)
+        Array.isArray(settings.patterns)
           ? settings.patterns.join("\\n")
           : "";
       ui.excludePatterns.value = Array.isArray(settings.excludePatterns)
         ? settings.excludePatterns.join("\\n")
         : "";
-      syncCooldownLabel();
+      syncTerminalCooldownLabel();
+      syncDiagnosticsCooldownLabel();
       syncVolumeLabel();
+      syncRegexValidation();
     }
 
     function syncVolumeLabel() {
@@ -568,28 +741,109 @@ function renderSettingsWebview(
       ui.builtInPatternsList.replaceChildren(...items);
     }
 
-    function setPatternMode(mode, clearCustom = true) {
+    function setPatternMode(mode) {
       const isAppend = mode === "append";
       ui.patternModeAppend.checked = isAppend;
       ui.patternModeOverride.checked = !isAppend;
-      if (clearCustom) {
-        ui.patterns.value = "";
-      }
       ui.appendReadonlyWrap.classList.toggle("hidden", !isAppend);
       renderBuiltInPatternsList();
     }
 
+    function parseInvalidRegexLines(text) {
+      return text
+        .split(/\\r?\\n/)
+        .map((rawLine, index) => ({
+          lineNumber: index + 1,
+          value: rawLine.trim(),
+        }))
+        .filter((entry) => entry.value.length > 0)
+        .map((entry) => {
+          try {
+            new RegExp(entry.value, "i");
+            return null;
+          } catch (err) {
+            return {
+              lineNumber: entry.lineNumber,
+              value: entry.value,
+              reason: err instanceof Error ? err.message : String(err),
+            };
+          }
+        })
+        .filter((entry) => entry !== null);
+    }
+
+    function renderValidationList(element, title, entries) {
+      if (!entries.length) {
+        element.classList.add("hidden");
+        element.replaceChildren();
+        return;
+      }
+
+      const maxVisible = 10;
+      const visibleEntries = entries.slice(0, maxVisible);
+      const items = visibleEntries.map((entry) => {
+        const li = document.createElement("li");
+        li.textContent = title + " line " + entry.lineNumber + ": ";
+        const code = document.createElement("code");
+        code.textContent = entry.value;
+        li.appendChild(code);
+        return li;
+      });
+
+      if (entries.length > maxVisible) {
+        const more = document.createElement("li");
+        more.textContent = "+" + String(entries.length - maxVisible) + " more invalid entries";
+        items.push(more);
+      }
+
+      element.replaceChildren(...items);
+      element.classList.remove("hidden");
+    }
+
+    function syncRegexValidation() {
+      const invalidPatterns = parseInvalidRegexLines(ui.patterns.value);
+      const invalidExcludePatterns = parseInvalidRegexLines(ui.excludePatterns.value);
+      const totalInvalid = invalidPatterns.length + invalidExcludePatterns.length;
+
+      if (totalInvalid === 0) {
+        ui.regexValidationSummary.textContent = "All regex entries look valid.";
+        ui.regexValidationSummary.classList.add("ok");
+        ui.regexValidationSummary.classList.remove("error");
+      } else {
+        ui.regexValidationSummary.textContent =
+          String(totalInvalid) + " invalid regex line(s) detected.";
+        ui.regexValidationSummary.classList.add("error");
+        ui.regexValidationSummary.classList.remove("ok");
+      }
+
+      renderValidationList(ui.invalidPatternList, "Pattern", invalidPatterns);
+      renderValidationList(ui.invalidExcludePatternList, "Exclude", invalidExcludePatterns);
+    }
+
     function collectSettings() {
-      const cooldownRaw = Number(ui.cooldownMs.value);
+      const terminalCooldownRaw = Number(ui.terminalCooldownMs.value);
+      const diagnosticsCooldownRaw = Number(ui.diagnosticsCooldownMs.value);
       const volumeRaw = Number(ui.volumePercent.value);
+      const terminalCooldownMs = Number.isFinite(terminalCooldownRaw)
+        ? Math.max(500, Math.round(terminalCooldownRaw))
+        : 1500;
+      const diagnosticsCooldownMs = Number.isFinite(diagnosticsCooldownRaw)
+        ? Math.max(500, Math.round(diagnosticsCooldownRaw))
+        : 1500;
       return {
         enabled,
         monitorTerminal,
         monitorDiagnostics,
+        quietHoursEnabled,
         diagnosticsSeverity:
           ui.diagnosticsSeverity.value === "warningAndError" ? "warningAndError" : "error",
-        cooldownMs: Number.isFinite(cooldownRaw) ? Math.max(500, Math.round(cooldownRaw)) : 1500,
+        cooldownMs: Math.max(terminalCooldownMs, diagnosticsCooldownMs),
+        terminalCooldownMs,
+        diagnosticsCooldownMs,
         volumePercent: Number.isFinite(volumeRaw) ? Math.min(100, Math.max(0, Math.round(volumeRaw))) : 70,
+        customSoundPath: customSoundPath.trim(),
+        quietHoursStart: ui.quietHoursStart.value || "22:00",
+        quietHoursEnd: ui.quietHoursEnd.value || "07:00",
         patternMode: getPatternMode(),
         patterns: ui.patterns.value
           .split(/\\r?\\n/)
@@ -600,6 +854,12 @@ function renderSettingsWebview(
           .map((line) => line.trim())
           .filter((line) => line.length > 0),
       };
+    }
+
+    function getPersistTarget() {
+      if (!hasWorkspace) return "global";
+      if (ui.saveTarget && ui.saveTarget.value === "workspace") return "workspace";
+      return "global";
     }
 
     function flashStatus(text, kind = "ok") {
@@ -624,20 +884,37 @@ function renderSettingsWebview(
       monitorDiagnostics = !monitorDiagnostics;
       setSwitchState(ui.monitorDiagnosticsSwitch, monitorDiagnostics);
     });
+    ui.quietHoursSwitch.addEventListener("click", () => {
+      quietHoursEnabled = !quietHoursEnabled;
+      setSwitchState(ui.quietHoursSwitch, quietHoursEnabled);
+    });
+    ui.uploadSoundBtn.addEventListener("click", () => {
+      vscode.postMessage({ type: "selectSoundFile" });
+    });
+    ui.useDefaultSoundBtn.addEventListener("click", () => {
+      customSoundPath = "";
+      syncCustomSoundDisplay();
+      flashStatus("Using default faah");
+    });
 
     ui.volumePercent.addEventListener("input", syncVolumeLabel);
-    ui.cooldownMs.addEventListener("input", syncCooldownLabel);
+    ui.terminalCooldownMs.addEventListener("input", syncTerminalCooldownLabel);
+    ui.diagnosticsCooldownMs.addEventListener("input", syncDiagnosticsCooldownLabel);
+    ui.patterns.addEventListener("input", syncRegexValidation);
+    ui.excludePatterns.addEventListener("input", syncRegexValidation);
     ui.patternModeOverride.addEventListener("change", () => {
       if (!ui.patternModeOverride.checked) return;
       setPatternMode("override");
+      syncRegexValidation();
     });
     ui.patternModeAppend.addEventListener("change", () => {
       if (!ui.patternModeAppend.checked) return;
       setPatternMode("append");
+      syncRegexValidation();
     });
 
     ui.saveBtn.addEventListener("click", () => {
-      vscode.postMessage({ type: "save", payload: collectSettings() });
+      vscode.postMessage({ type: "save", payload: collectSettings(), target: getPersistTarget() });
     });
 
     ui.testBtn.addEventListener("click", () => {
@@ -652,7 +929,7 @@ function renderSettingsWebview(
       };
       suppressNextSavedStatus = true;
       applySettings(resetSettings);
-      vscode.postMessage({ type: "save", payload: resetSettings });
+      vscode.postMessage({ type: "save", payload: resetSettings, target: getPersistTarget() });
     });
 
     window.addEventListener("message", (event) => {
@@ -665,8 +942,16 @@ function renderSettingsWebview(
           suppressNextSavedStatus = false;
           return;
         }
+        const targetLabel = message.target === "workspace" ? "workspace" : "user";
+        flashStatus("Saved to " + targetLabel + " settings");
+      }
 
-        flashStatus("Saved");
+      if (message.type === "selectedSoundFile") {
+        if (typeof message.payload === "string" && message.payload.trim().length > 0) {
+          customSoundPath = message.payload.trim();
+          syncCustomSoundDisplay();
+          flashStatus("Sound file selected. Click Save Changes.");
+        }
       }
 
       if (message.type === "error") {
@@ -684,16 +969,17 @@ function renderSettingsWebview(
 export function registerSettingsUiCommand(
   context: vscode.ExtensionContext,
   getStoredSettings: () => StoredSettings,
-  onSaved: (settings: StoredSettings) => Promise<void>,
+  onSaved: (settings: StoredSettings, target: SettingsPersistTarget) => Promise<void>,
   onTest: (settings: StoredSettings) => void,
   commandId = commandIds.openSettingsUi,
 ): vscode.Disposable {
   let panel: vscode.WebviewPanel | undefined;
 
   return vscode.commands.registerCommand(commandId, async () => {
+    const hasWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
     if (panel) {
       panel.reveal(vscode.ViewColumn.One);
-      panel.webview.html = renderSettingsWebview(panel.webview, context, getStoredSettings());
+      panel.webview.html = renderSettingsWebview(panel.webview, context, getStoredSettings(), hasWorkspace);
       return;
     }
 
@@ -712,7 +998,7 @@ export function registerSettingsUiCommand(
       dark: panelIconPath,
     };
 
-    panel.webview.html = renderSettingsWebview(panel.webview, context, getStoredSettings());
+    panel.webview.html = renderSettingsWebview(panel.webview, context, getStoredSettings(), hasWorkspace);
 
     panel.onDidDispose(() => {
       panel = undefined;
@@ -720,6 +1006,24 @@ export function registerSettingsUiCommand(
 
     panel.webview.onDidReceiveMessage(async (message) => {
       if (!message || typeof message.type !== "string") return;
+
+      if (message.type === "selectSoundFile") {
+        const selected = await vscode.window.showOpenDialog({
+          title: "Select custom Faah sound",
+          canSelectMany: false,
+          canSelectFiles: true,
+          canSelectFolders: false,
+          filters: {
+            Audio: ["wav", "mp3", "ogg", "m4a", "aac", "flac"],
+            AllFiles: ["*"],
+          },
+        });
+        const selectedPath = selected?.[0]?.fsPath;
+        if (selectedPath) {
+          panel?.webview.postMessage({ type: "selectedSoundFile", payload: selectedPath });
+        }
+        return;
+      }
 
       if (message.type === "test") {
         const normalized = normalizeStoredSettings((message.payload ?? {}) as Partial<StoredSettings>);
@@ -731,8 +1035,10 @@ export function registerSettingsUiCommand(
 
       try {
         const normalized = normalizeStoredSettings((message.payload ?? {}) as Partial<StoredSettings>);
-        await onSaved(normalized);
-        panel?.webview.postMessage({ type: "saved", payload: normalized });
+        const persistTarget: SettingsPersistTarget =
+          message.target === "workspace" && hasWorkspace ? "workspace" : "global";
+        await onSaved(normalized, persistTarget);
+        panel?.webview.postMessage({ type: "saved", payload: normalized, target: persistTarget });
       } catch (err) {
         const messageText = err instanceof Error ? err.message : String(err);
         panel?.webview.postMessage({ type: "error", payload: messageText });
