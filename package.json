@@ -1,21 +1,35 @@
 {
   "name": "faah",
-  "displayName": "Faah",
-  "description": "When errors get dramatic, Faah gets louder.",
+  "displayName": "Faah - Error Alerts",
+  "description": "Never miss errors in VS Code. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.",
   "icon": "images/icon.png",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kiron0/faah.git"
+    "url": "https://github.com/kiron0/faah"
   },
-  "homepage": "https://faah.kiron.dev",
+  "homepage": "https://faah.js.org",
   "engines": {
     "vscode": "^1.109.0"
   },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "error",
+    "errors",
+    "alerts",
+    "notifications",
+    "terminal",
+    "diagnostics",
+    "status bar",
+    "quick actions",
+    "regex",
+    "debugging",
+    "developer productivity",
+    "vscode alerts"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -218,7 +232,7 @@
     "play-sound": "^1.1.6"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
+    "@types/node": "^25.3.2",
     "@types/play-sound": "^1.1.2",
     "@types/vscode": "^1.109.0",
     "@vscode/vsce": "^3.7.1",

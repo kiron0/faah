@@ -120,7 +120,15 @@ function renderSettingsWebview(
       color: #d9edff;
       font-size: 0.8rem;
       background: rgba(91, 182, 255, 0.15);
-      white-space: nowrap;
+      white-space: normal;
+      max-width: min(60ch, 100%);
+      line-height: 1.3;
+    }
+
+    .pill.error {
+      border-color: rgba(255, 111, 111, 0.5);
+      color: #ffd8d8;
+      background: rgba(255, 111, 111, 0.16);
     }
 
     .grid {
@@ -455,7 +463,7 @@ function renderSettingsWebview(
           <p>Tune your alert behavior without opening VS Code settings.</p>
         </div>
       </div>
-      <div class="pill">Click Save Changes to persist updates</div>
+      <div id="pillStatus" class="pill" role="status" aria-live="polite">Settings auto-save instantly to keep everything in sync.</div>
     </section>
 
     <section class="grid">
@@ -650,15 +658,27 @@ function renderSettingsWebview(
       testBtn: document.getElementById("testBtn"),
       resetBtn: document.getElementById("resetBtn"),
       status: document.getElementById("status"),
+      pillStatus: document.getElementById("pillStatus"),
     };
 
+    const autoSaveDebounceMs = 450;
+    const textAutoSaveDebounceMs = 900;
+    const defaultPillMessage = "Settings auto-save instantly to keep everything in sync.";
     let enabled = true;
     let monitorTerminal = true;
     let monitorDiagnostics = true;
     let customSoundPath = "";
     let quietHoursEnabled = false;
+    let invalidRegexCount = 0;
     let statusTimer = null;
+    let pillTimer = null;
+    let autoSaveTimer = null;
     let suppressNextSavedStatus = false;
+    let saveInFlight = false;
+    let activeSaveMode = "manual";
+    let queuedSaveMode = null;
+    let queuedSaveForce = false;
+    let latestSavedSignature = "";
 
     function setSwitchState(element, isOn) {
       element.classList.toggle("on", isOn);
@@ -804,6 +824,7 @@ function renderSettingsWebview(
       const invalidPatterns = parseInvalidRegexLines(ui.patterns.value);
       const invalidExcludePatterns = parseInvalidRegexLines(ui.excludePatterns.value);
       const totalInvalid = invalidPatterns.length + invalidExcludePatterns.length;
+      invalidRegexCount = totalInvalid;
 
       if (totalInvalid === 0) {
         ui.regexValidationSummary.textContent = "All regex entries look valid.";
@@ -862,6 +883,20 @@ function renderSettingsWebview(
       return "global";
     }
 
+    function createSettingsSignature(settings) {
+      return JSON.stringify(settings);
+    }
+
+    function flashPill(text, kind = "ok") {
+      ui.pillStatus.textContent = text;
+      ui.pillStatus.classList.toggle("error", kind === "error");
+      if (pillTimer) clearTimeout(pillTimer);
+      pillTimer = setTimeout(() => {
+        ui.pillStatus.textContent = defaultPillMessage;
+        ui.pillStatus.classList.remove("error");
+      }, 2200);
+    }
+
     function flashStatus(text, kind = "ok") {
       ui.status.textContent = text;
       ui.status.classList.toggle("error", kind === "error");
@@ -870,23 +905,84 @@ function renderSettingsWebview(
       statusTimer = setTimeout(() => {
         ui.status.classList.remove("visible");
       }, 2200);
+      flashPill(text, kind);
+    }
+
+    function queueSave(mode, force) {
+      if (mode === "manual") {
+        queuedSaveMode = "manual";
+        queuedSaveForce = true;
+        return;
+      }
+
+      if (queuedSaveMode === "manual") return;
+      queuedSaveMode = "auto";
+      queuedSaveForce = !!force;
+    }
+
+    function flushQueuedSave() {
+      if (!queuedSaveMode) return;
+      const mode = queuedSaveMode;
+      const force = queuedSaveForce;
+      queuedSaveMode = null;
+      queuedSaveForce = false;
+      requestSave(mode, force);
+    }
+
+    function requestSave(mode = "manual", force = false, explicitPayload) {
+      const payload = explicitPayload || collectSettings();
+      const signature = createSettingsSignature(payload);
+      const invalidEntriesPresent = invalidRegexCount > 0;
+
+      if (!force && mode === "auto" && invalidEntriesPresent) {
+        flashPill("Fix invalid regex entries to resume auto-save.", "error");
+        return false;
+      }
+      if (!force && mode === "auto" && signature === latestSavedSignature) return false;
+
+      if (saveInFlight) {
+        queueSave(mode, force);
+        return false;
+      }
+
+      saveInFlight = true;
+      activeSaveMode = mode;
+      vscode.postMessage({ type: "save", payload, target: getPersistTarget() });
+      return true;
+    }
+
+    function scheduleAutoSave(delay = autoSaveDebounceMs) {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        autoSaveTimer = null;
+        requestSave("auto");
+      }, delay);
+    }
+
+    function markChanged(delay = autoSaveDebounceMs) {
+      flashPill("Changes detected. Auto-saving...");
+      scheduleAutoSave(delay);
     }
 
     ui.enabledSwitch.addEventListener("click", () => {
       enabled = !enabled;
       setSwitchState(ui.enabledSwitch, enabled);
+      markChanged();
     });
     ui.monitorTerminalSwitch.addEventListener("click", () => {
       monitorTerminal = !monitorTerminal;
       setSwitchState(ui.monitorTerminalSwitch, monitorTerminal);
+      markChanged();
     });
     ui.monitorDiagnosticsSwitch.addEventListener("click", () => {
       monitorDiagnostics = !monitorDiagnostics;
       setSwitchState(ui.monitorDiagnosticsSwitch, monitorDiagnostics);
+      markChanged();
     });
     ui.quietHoursSwitch.addEventListener("click", () => {
       quietHoursEnabled = !quietHoursEnabled;
       setSwitchState(ui.quietHoursSwitch, quietHoursEnabled);
+      markChanged();
     });
     ui.uploadSoundBtn.addEventListener("click", () => {
       vscode.postMessage({ type: "selectSoundFile" });
@@ -894,27 +990,57 @@ function renderSettingsWebview(
     ui.useDefaultSoundBtn.addEventListener("click", () => {
       customSoundPath = "";
       syncCustomSoundDisplay();
-      flashStatus("Using default faah");
+      markChanged();
     });
 
-    ui.volumePercent.addEventListener("input", syncVolumeLabel);
-    ui.terminalCooldownMs.addEventListener("input", syncTerminalCooldownLabel);
-    ui.diagnosticsCooldownMs.addEventListener("input", syncDiagnosticsCooldownLabel);
-    ui.patterns.addEventListener("input", syncRegexValidation);
-    ui.excludePatterns.addEventListener("input", syncRegexValidation);
+    ui.volumePercent.addEventListener("input", () => {
+      syncVolumeLabel();
+      markChanged();
+    });
+    ui.terminalCooldownMs.addEventListener("input", () => {
+      syncTerminalCooldownLabel();
+      markChanged();
+    });
+    ui.diagnosticsCooldownMs.addEventListener("input", () => {
+      syncDiagnosticsCooldownLabel();
+      markChanged();
+    });
+    ui.diagnosticsSeverity.addEventListener("change", () => {
+      markChanged();
+    });
+    ui.quietHoursStart.addEventListener("input", () => {
+      markChanged();
+    });
+    ui.quietHoursEnd.addEventListener("input", () => {
+      markChanged();
+    });
+    ui.patterns.addEventListener("input", () => {
+      syncRegexValidation();
+      markChanged(textAutoSaveDebounceMs);
+    });
+    ui.excludePatterns.addEventListener("input", () => {
+      syncRegexValidation();
+      markChanged(textAutoSaveDebounceMs);
+    });
     ui.patternModeOverride.addEventListener("change", () => {
       if (!ui.patternModeOverride.checked) return;
       setPatternMode("override");
       syncRegexValidation();
+      markChanged(textAutoSaveDebounceMs);
     });
     ui.patternModeAppend.addEventListener("change", () => {
       if (!ui.patternModeAppend.checked) return;
       setPatternMode("append");
       syncRegexValidation();
+      markChanged(textAutoSaveDebounceMs);
     });
 
     ui.saveBtn.addEventListener("click", () => {
-      vscode.postMessage({ type: "save", payload: collectSettings(), target: getPersistTarget() });
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+      }
+      requestSave("manual", true);
     });
 
     ui.testBtn.addEventListener("click", () => {
@@ -929,7 +1055,7 @@ function renderSettingsWebview(
       };
       suppressNextSavedStatus = true;
       applySettings(resetSettings);
-      vscode.postMessage({ type: "save", payload: resetSettings, target: getPersistTarget() });
+      requestSave("manual", true, resetSettings);
     });
 
     window.addEventListener("message", (event) => {
@@ -937,30 +1063,53 @@ function renderSettingsWebview(
       if (!message || typeof message.type !== "string") return;
 
       if (message.type === "saved") {
-        applySettings(message.payload || initial);
+        saveInFlight = false;
+        const savedSettings = message.payload || initial;
+        latestSavedSignature = createSettingsSignature(savedSettings);
+        applySettings(savedSettings);
         if (suppressNextSavedStatus) {
           suppressNextSavedStatus = false;
+          flushQueuedSave();
           return;
         }
         const targetLabel = message.target === "workspace" ? "workspace" : "user";
-        flashStatus("Saved to " + targetLabel + " settings");
+        if (activeSaveMode === "auto") {
+          flashStatus("Changes auto-saved to " + targetLabel + " settings");
+        } else {
+          flashStatus("Saved to " + targetLabel + " settings");
+        }
+        flushQueuedSave();
+        return;
       }
 
       if (message.type === "selectedSoundFile") {
         if (typeof message.payload === "string" && message.payload.trim().length > 0) {
           customSoundPath = message.payload.trim();
           syncCustomSoundDisplay();
-          flashStatus("Sound file selected. Click Save Changes.");
+          flashStatus("Sound file selected. Auto-saving...");
+          markChanged();
         }
+        return;
+      }
+
+      if (message.type === "externalSettingsUpdated") {
+        const externalSettings = message.payload || initial;
+        latestSavedSignature = createSettingsSignature(externalSettings);
+        applySettings(externalSettings);
+        return;
       }
 
       if (message.type === "error") {
+        saveInFlight = false;
+        queuedSaveMode = null;
+        queuedSaveForce = false;
         suppressNextSavedStatus = false;
         flashStatus(String(message.payload || "Failed to save settings"), "error");
       }
     });
 
     applySettings(initial);
+    latestSavedSignature = createSettingsSignature(collectSettings());
   </script>
 </body>
 </html>`;
@@ -975,7 +1124,7 @@ export function registerSettingsUiCommand(
 ): vscode.Disposable {
   let panel: vscode.WebviewPanel | undefined;
 
-  return vscode.commands.registerCommand(commandId, async () => {
+  const commandDisposable = vscode.commands.registerCommand(commandId, async () => {
     const hasWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
     if (panel) {
       panel.reveal(vscode.ViewColumn.One);
@@ -1045,4 +1194,15 @@ export function registerSettingsUiCommand(
       }
     });
   });
+
+  const configurationDisposable = vscode.workspace.onDidChangeConfiguration((event) => {
+    if (!panel) return;
+    if (!event.affectsConfiguration("faah")) return;
+    panel.webview.postMessage({
+      type: "externalSettingsUpdated",
+      payload: getStoredSettings(),
+    });
+  });
+
+  return vscode.Disposable.from(commandDisposable, configurationDisposable);
 }
