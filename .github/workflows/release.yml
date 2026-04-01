@@ -41,7 +41,7 @@ jobs:
           NAME=$(node -p "require('./package.json').displayName || require('./package.json').name")
           DESCRIPTION=$(node -p "require('./package.json').description || ''")
           TAG="v$VERSION"
-          TITLE="$NAME $TAG"
+          TITLE="$TAG"
 
           {
             echo "version=$VERSION"
@@ -141,12 +141,6 @@ jobs:
           fi
 
           {
-            echo "## $TITLE"
-            echo
-            if [ -n "$DESCRIPTION" ]; then
-              echo "$DESCRIPTION"
-              echo
-            fi
             echo "### Release Info"
             echo "- Version: $VERSION"
             echo "- Tag: $CURRENT_TAG"
@@ -159,7 +153,6 @@ jobs:
             else
               echo "- Initial release"
             fi
-            echo
             echo
             echo "### Artifact"
             echo "- VSIX package attached to this release"
