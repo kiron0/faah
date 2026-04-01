@@ -5,7 +5,7 @@
 
 ### Your Error Drama Alarm for VS Code
 
-Never miss errors in VS Code. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.
+Never miss errors in your editor. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.
 
   <p>
     <img src="https://img.shields.io/badge/VS%20Code-1.105.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
