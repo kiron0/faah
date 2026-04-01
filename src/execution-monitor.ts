@@ -1,11 +1,13 @@
-import * as vscode from "vscode";
-
 import { getAlertSuppressionReason, tryAcquirePlaybackWindow } from "./alert-gate";
 import { playAlert } from "./audio";
 import type { RuntimeSettings } from "./settings";
 
-const tailByExecution = new WeakMap<vscode.TerminalShellExecution, string>();
-const playedByExecution = new WeakSet<vscode.TerminalShellExecution>();
+export type TerminalExecutionLike = object & {
+  read(): AsyncIterable<string>;
+};
+
+const tailByExecution = new WeakMap<TerminalExecutionLike, string>();
+const playedByExecution = new WeakSet<object>();
 
 const MAX_TAIL_LENGTH = 500;
 const LINE_SPLIT_REGEX = /\r?\n/;
@@ -24,7 +26,7 @@ function normalizeTerminalLine(text: string): string {
 }
 
 function hasErrorInChunk(
-  execution: vscode.TerminalShellExecution,
+  execution: TerminalExecutionLike,
   chunk: string,
   patterns: readonly RegExp[],
   excludePatterns: readonly RegExp[],
@@ -47,7 +49,7 @@ function hasErrorInChunk(
 }
 
 export function tryPlayForExecution(
-  execution: vscode.TerminalShellExecution,
+  execution: object,
   settings: RuntimeSettings,
   soundPath: string,
 ): void {
@@ -61,7 +63,7 @@ export function tryPlayForExecution(
 }
 
 export async function monitorExecutionOutput(
-  execution: vscode.TerminalShellExecution,
+  execution: TerminalExecutionLike,
   getSettings: () => RuntimeSettings,
   getSoundPath: () => string,
 ): Promise<void> {

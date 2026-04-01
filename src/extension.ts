@@ -13,6 +13,11 @@ import {
   scanActiveEditorDiagnostics,
 } from "./diagnostics-monitor";
 import { monitorExecutionOutput, tryPlayForExecution } from "./execution-monitor";
+import {
+  getTerminalShellExecutionApi,
+  isExecutionIdentity,
+  isTerminalExecutionLike,
+} from "./terminal-shell-integration";
 import { registerSettingsUiCommand } from "./settings-webview";
 import {
   isValidQuietHoursTime,
@@ -54,6 +59,14 @@ export function activate(context: vscode.ExtensionContext): void {
   let editorTypingDebounceTimer: ReturnType<typeof setTimeout> | undefined;
   let statusRefreshTimer: ReturnType<typeof setInterval> | undefined;
   const { item: statusBarItem, update: updateStatusBar } = createStatusBarController();
+  const terminalShellExecutionApi = getTerminalShellExecutionApi();
+  const terminalMonitoringSupported = terminalShellExecutionApi !== null;
+
+  if (!terminalMonitoringSupported) {
+    console.info(
+      "[faah] Terminal shell execution APIs are unavailable in this host. Terminal monitoring is disabled for this session.",
+    );
+  }
 
   const clearEditorTypingDebounce = (): void => {
     if (!editorTypingDebounceTimer) return;
@@ -69,11 +82,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const syncStatusBar = (): void => {
     const snoozeRemainingMs = getSnoozeRemainingMs();
-    updateStatusBar(settings, { snoozeRemainingMs });
+    updateStatusBar(settings, {
+      snoozeRemainingMs,
+      terminalMonitoringSupported,
+    });
 
     if (snoozeRemainingMs > 0 && !statusRefreshTimer) {
       statusRefreshTimer = setInterval(() => {
-        updateStatusBar(settings, { snoozeRemainingMs: getSnoozeRemainingMs() });
+        updateStatusBar(settings, {
+          snoozeRemainingMs: getSnoozeRemainingMs(),
+          terminalMonitoringSupported,
+        });
       }, statusRefreshIntervalMs);
       return;
     }
@@ -121,14 +140,16 @@ export function activate(context: vscode.ExtensionContext): void {
     });
   };
 
-  const startDisposable = vscode.window.onDidStartTerminalShellExecution((event) => {
+  const startDisposable = terminalShellExecutionApi?.onDidStartTerminalShellExecution?.((event) => {
     if (!settings.enabled || !settings.monitorTerminal) return;
+    if (!isTerminalExecutionLike(event.execution)) return;
     void monitorExecutionOutput(event.execution, () => settings, () => soundPath);
   });
 
-  const endDisposable = vscode.window.onDidEndTerminalShellExecution((event) => {
+  const endDisposable = terminalShellExecutionApi?.onDidEndTerminalShellExecution?.((event) => {
     if (!settings.enabled || !settings.monitorTerminal) return;
     if (event.exitCode === undefined || event.exitCode === 0) return;
+    if (!isExecutionIdentity(event.execution)) return;
     tryPlayForExecution(event.execution, settings, soundPath);
   });
 
@@ -289,6 +310,9 @@ export function activate(context: vscode.ExtensionContext): void {
     };
 
     const snoozeRemainingMs = getSnoozeRemainingMs();
+    const terminalMonitoringDescription = terminalMonitoringSupported
+      ? "Watch shell output for errors"
+      : "Unavailable in this Cursor/VS Code version";
     const actions: QuickAction[] = [
       {
         label: settings.enabled ? "Disable Faah" : "Enable Faah",
@@ -296,8 +320,12 @@ export function activate(context: vscode.ExtensionContext): void {
         action: "toggleEnabled",
       },
       {
-        label: settings.monitorTerminal ? "Disable Terminal Monitoring" : "Enable Terminal Monitoring",
-        description: "Watch shell output for errors",
+        label: terminalMonitoringSupported
+          ? settings.monitorTerminal
+            ? "Disable Terminal Monitoring"
+            : "Enable Terminal Monitoring"
+          : "Terminal Monitoring Unavailable",
+        description: terminalMonitoringDescription,
         action: "toggleTerminal",
       },
       {
@@ -359,6 +387,12 @@ export function activate(context: vscode.ExtensionContext): void {
         await patchSettings({ enabled: !storedSettings.enabled });
         break;
       case "toggleTerminal":
+        if (!terminalMonitoringSupported) {
+          vscode.window.showInformationMessage(
+            "Faah terminal monitoring is unavailable in this Cursor/VS Code version.",
+          );
+          break;
+        }
         await patchSettings({ monitorTerminal: !storedSettings.monitorTerminal });
         break;
       case "toggleDiagnostics":
@@ -421,8 +455,6 @@ export function activate(context: vscode.ExtensionContext): void {
   scanActiveEditorDiagnostics(() => settings, () => soundPath);
 
   context.subscriptions.push(
-    startDisposable,
-    endDisposable,
     settingsUiDisposable,
     playTestSoundDisposable,
     snoozeDisposable,
@@ -438,6 +470,14 @@ export function activate(context: vscode.ExtensionContext): void {
     { dispose: disposeDiagnosticsMonitorState },
     statusBarItem,
   );
+
+  if (startDisposable) {
+    context.subscriptions.push(startDisposable);
+  }
+
+  if (endDisposable) {
+    context.subscriptions.push(endDisposable);
+  }
 }
 
 export function deactivate(): void {}

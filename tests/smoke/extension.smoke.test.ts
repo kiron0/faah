@@ -81,7 +81,10 @@ function createRuntimeSettings(stored: StoredSettings): RuntimeSettings {
   };
 }
 
-async function loadExtensionHarness(enabled = true): Promise<Harness> {
+async function loadExtensionHarness(
+  enabled = true,
+  supportsTerminalShellExecution = true,
+): Promise<Harness> {
   vi.resetModules();
 
   let startHandler: ((event: { execution: unknown }) => void) | undefined;
@@ -139,18 +142,22 @@ async function loadExtensionHarness(enabled = true): Promise<Harness> {
       activeTextEditor: {
         document: { uri: activeUri },
       },
-      onDidStartTerminalShellExecution: vi.fn(
-        (cb: (event: { execution: unknown }) => void) => {
-          startHandler = cb;
-          return startDisposable;
-        },
-      ),
-      onDidEndTerminalShellExecution: vi.fn(
-        (cb: (event: { execution: unknown; exitCode?: number }) => void) => {
-          endHandler = cb;
-          return endDisposable;
-        },
-      ),
+      ...(supportsTerminalShellExecution
+        ? {
+            onDidStartTerminalShellExecution: vi.fn(
+              (cb: (event: { execution: unknown }) => void) => {
+                startHandler = cb;
+                return startDisposable;
+              },
+            ),
+            onDidEndTerminalShellExecution: vi.fn(
+              (cb: (event: { execution: unknown; exitCode?: number }) => void) => {
+                endHandler = cb;
+                return endDisposable;
+              },
+            ),
+          }
+        : {}),
       onDidChangeActiveTextEditor: vi.fn((cb: () => void) => {
         activeEditorHandler = cb;
         return activeEditorDisposable;
@@ -280,7 +287,9 @@ describe("extension smoke tests", () => {
     expect(harness.commandHandlers.has("faah.setQuietHours")).toBe(true);
     expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(1);
 
-    const execution = {};
+    const execution = {
+      read: async function* () {},
+    };
     startHandler?.({ execution });
     expect(harness.mocks.monitorExecutionOutput).toHaveBeenCalledTimes(1);
 
@@ -311,12 +320,30 @@ describe("extension smoke tests", () => {
     const startHandler = harness.getStartHandler();
     const endHandler = harness.getEndHandler();
 
-    const execution = {};
+    const execution = {
+      read: async function* () {},
+    };
     startHandler?.({ execution });
     endHandler?.({ execution, exitCode: 1 });
 
     expect(harness.mocks.monitorExecutionOutput).not.toHaveBeenCalled();
     expect(harness.mocks.tryPlayForExecution).not.toHaveBeenCalled();
+  });
+
+  it("keeps diagnostics active when terminal shell integration is unavailable", async () => {
+    const harness = await loadExtensionHarness(true, false);
+    harness.extension.activate(harness.context as any);
+    const activeEditorHandler = harness.getActiveEditorHandler();
+    const textDocumentHandler = harness.getTextDocumentHandler();
+    const diagnosticsHandler = harness.getDiagnosticsHandler();
+
+    expect(harness.context.subscriptions).toHaveLength(14);
+    expect(harness.getStartHandler()).toBeUndefined();
+    expect(harness.getEndHandler()).toBeUndefined();
+    expect(activeEditorHandler).toBeTypeOf("function");
+    expect(textDocumentHandler).toBeTypeOf("function");
+    expect(diagnosticsHandler).toBeTypeOf("function");
+    expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(1);
   });
 
   it("debounces diagnostics while typing in active editor", async () => {

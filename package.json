@@ -3,7 +3,7 @@
   "displayName": "Faah - Error Alerts",
   "description": "Never miss errors in VS Code. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.",
   "icon": "images/icon.png",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {
@@ -12,7 +12,7 @@
   },
   "homepage": "https://faah.js.org",
   "engines": {
-    "vscode": "^1.109.0"
+    "vscode": "^1.105.0"
   },
   "categories": [
     "Other"
@@ -28,6 +28,7 @@
     "quick actions",
     "regex",
     "debugging",
+    "sound",
     "developer productivity",
     "vscode alerts"
   ],
@@ -81,7 +82,7 @@
           "type": "boolean",
           "default": true,
           "scope": "resource",
-          "description": "Monitor terminal command output for errors."
+          "description": "Monitor terminal command output for errors when supported by your editor host."
         },
         "faah.monitorDiagnostics": {
           "type": "boolean",
@@ -234,7 +235,7 @@
   "devDependencies": {
     "@types/node": "^25.3.2",
     "@types/play-sound": "^1.1.2",
-    "@types/vscode": "^1.109.0",
+    "@types/vscode": "1.105.0",
     "@vscode/vsce": "^3.7.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"

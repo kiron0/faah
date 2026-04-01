@@ -5,11 +5,17 @@ import type { RuntimeSettings } from "./settings";
 
 type StatusBarRuntimeState = {
   snoozeRemainingMs?: number;
+  terminalMonitoringSupported?: boolean;
 };
 
-function summarizeSources(settings: RuntimeSettings): string {
-  if (settings.monitorTerminal && settings.monitorDiagnostics) return "T+E";
-  if (settings.monitorTerminal) return "T";
+function summarizeSources(
+  settings: RuntimeSettings,
+  terminalMonitoringSupported: boolean,
+): string {
+  const terminalMonitoringEnabled = settings.monitorTerminal && terminalMonitoringSupported;
+
+  if (terminalMonitoringEnabled && settings.monitorDiagnostics) return "T+E";
+  if (terminalMonitoringEnabled) return "T";
   if (settings.monitorDiagnostics) return "E";
   return "None";
 }
@@ -42,7 +48,8 @@ export function createStatusBarController(): {
   item.show();
 
   const update = (settings: RuntimeSettings, runtimeState?: StatusBarRuntimeState): void => {
-    const sourceSummary = summarizeSources(settings);
+    const terminalMonitoringSupported = runtimeState?.terminalMonitoringSupported ?? true;
+    const sourceSummary = summarizeSources(settings, terminalMonitoringSupported);
     const snoozeRemainingMs = runtimeState?.snoozeRemainingMs ?? 0;
     const isSnoozed = snoozeRemainingMs > 0;
 
@@ -59,6 +66,9 @@ export function createStatusBarController(): {
     item.tooltip = [
       `Sources: ${sourceSummary}`,
       `Diagnostics severity: ${describeDiagnosticsSeverity(settings)}`,
+      ...(settings.monitorTerminal && !terminalMonitoringSupported
+        ? ["Terminal monitoring: unavailable in this Cursor/VS Code version."]
+        : []),
       `Terminal cooldown: ${settings.terminalCooldownMs}ms`,
       `Diagnostics cooldown: ${settings.diagnosticsCooldownMs}ms`,
       `Quiet hours: ${describeQuietHours(settings)}`,

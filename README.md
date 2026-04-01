@@ -8,7 +8,7 @@
   Never miss errors in VS Code. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.
 
   <p>
-    <img src="https://img.shields.io/badge/VS%20Code-1.109.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
+    <img src="https://img.shields.io/badge/VS%20Code-1.105.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
     <img src="https://img.shields.io/badge/License-MIT-16a34a?style=for-the-badge" />
   </p>
 
@@ -93,8 +93,15 @@ Faah just makes sure you hear it.
 ---
 
 ## Concept Idea
-Md Shoaib Taimur
+Md Shoaib Taimur | <a href="https://github.com/shoaibtaimur">GitHub</a>
 
 ## License
+MIT License © Toufiq Hasan Kiron | <a href="https://kiron.dev">Portfolio</a>
 
-MIT License © Toufiq Hasan Kiron
+## Contributing
+
+Contributions are welcome! Please feel free to submit an issue or a pull request.
+
+## Support
+
+If you have any questions or feedback, please feel free to contact me at <a href="mailto:hello@kiron.dev">hello@kiron.dev</a>.
