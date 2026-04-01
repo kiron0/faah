@@ -2,44 +2,71 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  publish:
+  release-if-missing:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
+      - name: Resolve version
+        id: version
+        run: echo "tag=v$(node -e 'console.log(require(\"./package.json\").version)')" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release already exists
+        id: check_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release already exists for ${{ steps.version.outputs.tag }}."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Release does not exist for ${{ steps.version.outputs.tag }}. Creating one."
+          fi
+
       - name: Install dependencies
+        if: steps.check_release.outputs.exists == 'false'
         run: bun install --frozen-lockfile
 
       - name: Typecheck (no emit)
+        if: steps.check_release.outputs.exists == 'false'
         run: bun run lint
 
       - name: Compile
+        if: steps.check_release.outputs.exists == 'false'
         run: bun run compile
 
       - name: Test
+        if: steps.check_release.outputs.exists == 'false'
         run: bun run test
 
       - name: Package VSIX
+        if: steps.check_release.outputs.exists == 'false'
         run: bun run package
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: "*.vsix"
-          generate_release_notes: true
+      - name: Create GitHub release
+        if: steps.check_release.outputs.exists == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --generate-notes \
+            ./*.vsix
