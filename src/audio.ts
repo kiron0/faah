@@ -105,18 +105,19 @@ function warnLinuxPlayerMissingOnce(errorText: string): void {
 function resolveCustomSoundPath(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) return "";
+  const pathApi = isWindows ? path.win32 : path;
 
   const withExpandedHome =
     trimmed === "~"
       ? (getHomeDirectory() ?? trimmed)
       : trimmed.startsWith("~/")
-        ? path.join(getHomeDirectory() ?? "~", trimmed.slice(2))
+        ? pathApi.join(getHomeDirectory() ?? "~", trimmed.slice(2))
         : trimmed;
 
-  if (path.isAbsolute(withExpandedHome)) return withExpandedHome;
+  if (pathApi.isAbsolute(withExpandedHome)) return withExpandedHome;
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (workspaceRoot) return path.resolve(workspaceRoot, withExpandedHome);
-  return path.resolve(withExpandedHome);
+  if (workspaceRoot) return pathApi.resolve(workspaceRoot, withExpandedHome);
+  return pathApi.resolve(withExpandedHome);
 }
 
 export function resolveSoundPath(
