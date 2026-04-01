@@ -36,20 +36,17 @@ If your errors get dramatic — **Faah gets louder.**
 ## Features
 
 - Plays `faah` by default, with optional uploaded custom sound override
-- Lightweight and fast
-- Regex-based error detection
+- Lightweight and fast, with regex-based error detection and configurable patterns/excludes
 - Separate cooldown controls for terminal and diagnostics sources
-- Terminal and editor diagnostics source toggles
-- Diagnostics severity mode (`Error` or `Error + Warning`)
-- Built-in false-positive exclude patterns you can edit
-- Regex validation preview in settings UI
-- Snooze controls (`15m`, `30m`, `1h`, `2h`) and clear snooze
-- Quiet hours (preset or custom `HH:mm` range)
-- Workspace-aware settings (`faah.*`) with global fallback
-- Auto-save settings in the Control Room
+- Terminal and editor diagnostics source toggles with diagnostics severity mode
+- Snooze controls (`15m`, `30m`, `1h`, `2h`) and clear snooze action
+- Quiet hours presets plus custom `HH:mm` ranges
+- Visual alerts (warning popups) plus audio for every alert
+- Quick presets (Balanced, Quiet, Aggressive) to snap into a mood
+- Settings import/export (JSON) for backups or sharing
+- Compatibility status command and notice when terminal monitoring is unavailable
+- Workspace-aware settings (`faah.*`) with auto-save Control Room UI
 - Status bar indicator with source-aware quick actions
-- Fully configurable patterns
-- Works smoothly across your coding workflow
 
 ---
 
@@ -59,7 +56,7 @@ Use Faah from the status bar quick actions or Command Palette.
 
 1. In VS Code, click `Faah Off`, `Faah T`, `Faah E`, or `Faah T+E` in the bottom bar.
 2. Choose what you want: turn Faah on/off, select terminal/editor/both, switch error mode, snooze alerts, set quiet hours, play test sound, or open full settings.
-3. In Settings UI, changes auto-save after edits.
+3. Settings auto-save instantly in the Control Room; use the schedule presets, compatibility button, or import/export buttons for explicit actions.
 
 Command Palette commands:
 
@@ -69,6 +66,7 @@ Command Palette commands:
 - `Faah: Snooze Alerts`
 - `Faah: Clear Snooze`
 - `Faah: Set Quiet Hours`
+- `Faah: Show Compatibility Status` (raises host compatibility info)
 
 ---
 
