@@ -13,6 +13,7 @@ function createStoredSettings(enabled: boolean): StoredSettings {
     diagnosticsCooldownMs: 1500,
     patternMode: "override",
     volumePercent: 70,
+    showVisualNotifications: false,
     customSoundPath: "",
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
@@ -28,7 +29,9 @@ describe("settings webview unit tests", () => {
 
     let commandHandler: (() => Promise<void>) | undefined;
     let configChangeHandler:
-      | ((event: { affectsConfiguration: (section: string) => boolean }) => void)
+      | ((event: {
+          affectsConfiguration: (section: string) => boolean;
+        }) => void)
       | undefined;
     const postMessage = vi.fn();
 
@@ -55,7 +58,11 @@ describe("settings webview unit tests", () => {
       workspace: {
         workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
         onDidChangeConfiguration: vi.fn(
-          (cb: (event: { affectsConfiguration: (section: string) => boolean }) => void) => {
+          (
+            cb: (event: {
+              affectsConfiguration: (section: string) => boolean;
+            }) => void,
+          ) => {
             configChangeHandler = cb;
             return { dispose: vi.fn() };
           },
@@ -88,6 +95,7 @@ describe("settings webview unit tests", () => {
       () => currentSettings,
       async () => undefined,
       () => undefined,
+      true,
     );
 
     configChangeHandler?.({

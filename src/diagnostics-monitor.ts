@@ -5,7 +5,7 @@ import {
   getRemainingPlaybackCooldownMs,
   tryAcquirePlaybackWindow,
 } from "./alert-gate";
-import { playAlert } from "./audio";
+import { triggerAlert } from "./alert-dispatch";
 import type { RuntimeSettings } from "./settings";
 
 const lastFingerprintByUri = new Map<string, string>();
@@ -23,7 +23,11 @@ function isDiagnosticSeverityAllowed(
   mode: RuntimeSettings["diagnosticsSeverity"],
 ): boolean {
   if (severity === vscode.DiagnosticSeverity.Error) return true;
-  if (mode === "warningAndError" && severity === vscode.DiagnosticSeverity.Warning) return true;
+  if (
+    mode === "warningAndError" &&
+    severity === vscode.DiagnosticSeverity.Warning
+  )
+    return true;
   return false;
 }
 
@@ -43,17 +47,29 @@ function serializeDiagnostic(diagnostic: vscode.Diagnostic): string {
   return `${source}|${code}|${range}|${diagnostic.message}`;
 }
 
-function createMonitoredDiagnosticsFingerprint(uri: vscode.Uri, settings: RuntimeSettings): string | null {
+function createMonitoredDiagnosticsFingerprint(
+  uri: vscode.Uri,
+  settings: RuntimeSettings,
+): string | null {
   const monitoredDiagnostics = vscode.languages
     .getDiagnostics(uri)
     .filter((diagnostic) =>
-      isDiagnosticSeverityAllowed(diagnostic.severity, settings.diagnosticsSeverity),
+      isDiagnosticSeverityAllowed(
+        diagnostic.severity,
+        settings.diagnosticsSeverity,
+      ),
     )
-    .filter((diagnostic) => !isDiagnosticExcluded(diagnostic, settings.excludePatterns));
+    .filter(
+      (diagnostic) =>
+        !isDiagnosticExcluded(diagnostic, settings.excludePatterns),
+    );
 
   if (monitoredDiagnostics.length === 0) return null;
 
-  return monitoredDiagnostics.map(serializeDiagnostic).sort().join(FINGERPRINT_LINE_SEPARATOR);
+  return monitoredDiagnostics
+    .map(serializeDiagnostic)
+    .sort()
+    .join(FINGERPRINT_LINE_SEPARATOR);
 }
 
 function clearRetry(uriKey: string): void {
@@ -71,10 +87,13 @@ function scheduleRetry(
 ): void {
   if (retryTimerByUri.has(uriKey)) return;
 
-  const timer = setTimeout(() => {
-    retryTimerByUri.delete(uriKey);
-    scanActiveEditorDiagnostics(getSettings, getSoundPath);
-  }, Math.max(50, delayMs));
+  const timer = setTimeout(
+    () => {
+      retryTimerByUri.delete(uriKey);
+      scanActiveEditorDiagnostics(getSettings, getSoundPath);
+    },
+    Math.max(50, delayMs),
+  );
   if (typeof timer.unref === "function") {
     timer.unref();
   }
@@ -115,14 +134,16 @@ function tryPlayForEditor(
     scheduleRetry(uriKey, remainingCooldownMs + 30, getSettings, getSoundPath);
     return;
   }
-  if (!tryAcquirePlaybackWindow(settings.diagnosticsCooldownMs, "diagnostics")) {
+  if (
+    !tryAcquirePlaybackWindow(settings.diagnosticsCooldownMs, "diagnostics")
+  ) {
     scheduleRetry(uriKey, 80, getSettings, getSoundPath);
     return;
   }
 
   clearRetry(uriKey);
   lastFingerprintByUri.set(uriKey, nextFingerprint);
-  playAlert(settings, getSoundPath());
+  triggerAlert("diagnostics", settings, getSoundPath());
 }
 
 export function scanActiveEditorDiagnostics(

@@ -25,7 +25,9 @@ function isEventLike(value: unknown): value is vscode.Event<unknown> {
   return typeof value === "function";
 }
 
-export function isTerminalExecutionLike(value: unknown): value is TerminalExecutionLike {
+export function isTerminalExecutionLike(
+  value: unknown,
+): value is TerminalExecutionLike {
   if (typeof value !== "object" || value === null) return false;
   return typeof (value as { read?: unknown }).read === "function";
 }

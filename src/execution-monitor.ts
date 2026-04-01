@@ -1,5 +1,8 @@
-import { getAlertSuppressionReason, tryAcquirePlaybackWindow } from "./alert-gate";
-import { playAlert } from "./audio";
+import {
+  getAlertSuppressionReason,
+  tryAcquirePlaybackWindow,
+} from "./alert-gate";
+import { triggerAlert } from "./alert-dispatch";
 import type { RuntimeSettings } from "./settings";
 
 export type TerminalExecutionLike = object & {
@@ -56,10 +59,11 @@ export function tryPlayForExecution(
   if (!settings.monitorTerminal) return;
   if (getAlertSuppressionReason(settings) !== null) return;
   if (playedByExecution.has(execution)) return;
-  if (!tryAcquirePlaybackWindow(settings.terminalCooldownMs, "terminal")) return;
+  if (!tryAcquirePlaybackWindow(settings.terminalCooldownMs, "terminal"))
+    return;
 
   playedByExecution.add(execution);
-  playAlert(settings, soundPath);
+  triggerAlert("terminal", settings, soundPath);
 }
 
 export async function monitorExecutionOutput(
@@ -76,7 +80,14 @@ export async function monitorExecutionOutput(
       if (!settings.enabled) continue;
       if (!settings.monitorTerminal) continue;
 
-      if (hasErrorInChunk(execution, chunk, settings.patterns, settings.excludePatterns)) {
+      if (
+        hasErrorInChunk(
+          execution,
+          chunk,
+          settings.patterns,
+          settings.excludePatterns,
+        )
+      ) {
         tryPlayForExecution(execution, settings, getSoundPath());
       }
     }

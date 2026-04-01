@@ -29,6 +29,7 @@ describe("settings unit tests", () => {
       diagnosticsSeverity: "warningAndError",
       cooldownMs: 100,
       volumePercent: 999,
+      showVisualNotifications: true,
       customSoundPath: "   ./sounds/custom.wav   ",
       patternMode: "append",
       patterns: ["   custom.*error   ", "   ", "", "panic"],
@@ -41,6 +42,7 @@ describe("settings unit tests", () => {
     expect(normalized.diagnosticsSeverity).toBe("warningAndError");
     expect(normalized.cooldownMs).toBe(500);
     expect(normalized.volumePercent).toBe(100);
+    expect(normalized.showVisualNotifications).toBe(true);
     expect(normalized.customSoundPath).toBe("./sounds/custom.wav");
     expect(normalized.patternMode).toBe("append");
     expect(normalized.patterns).toEqual(["custom.*error", "panic"]);
@@ -76,9 +78,15 @@ describe("settings unit tests", () => {
       patterns: ["\\bmy_custom_error_token\\b"],
     });
 
-    expect(runtime.patterns.length).toBe(settings.defaultStoredSettings.patterns.length + 1);
-    expect(runtime.patterns.some((pattern) => pattern.test("my_custom_error_token"))).toBe(true);
-    expect(runtime.excludePatterns.length).toBe(settings.defaultStoredSettings.excludePatterns.length);
+    expect(runtime.patterns.length).toBe(
+      settings.defaultStoredSettings.patterns.length + 1,
+    );
+    expect(
+      runtime.patterns.some((pattern) => pattern.test("my_custom_error_token")),
+    ).toBe(true);
+    expect(runtime.excludePatterns.length).toBe(
+      settings.defaultStoredSettings.excludePatterns.length,
+    );
   });
 
   it("falls back to default compiled patterns when override patterns are invalid", async () => {
@@ -91,7 +99,9 @@ describe("settings unit tests", () => {
       patterns: ["("],
     });
 
-    expect(runtime.patterns.length).toBe(settings.defaultStoredSettings.patterns.length);
+    expect(runtime.patterns.length).toBe(
+      settings.defaultStoredSettings.patterns.length,
+    );
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -115,7 +125,9 @@ describe("settings unit tests", () => {
     );
 
     expect(configUpdate).toHaveBeenCalled();
-    expect(configUpdate.mock.calls.every((call) => call[2] === "global")).toBe(true);
+    expect(configUpdate.mock.calls.every((call) => call[2] === "global")).toBe(
+      true,
+    );
     expect(globalStateUpdate).toHaveBeenCalledTimes(1);
   });
 
@@ -139,6 +151,37 @@ describe("settings unit tests", () => {
     );
 
     expect(configUpdate).toHaveBeenCalled();
-    expect(configUpdate.mock.calls.every((call) => call[2] === "workspace")).toBe(true);
+    expect(
+      configUpdate.mock.calls.every((call) => call[2] === "workspace"),
+    ).toBe(true);
+  });
+
+  it("applies the quiet preset with visual alerts and quiet hours enabled", async () => {
+    const settings = await loadSettingsModule();
+
+    const preset = settings.createPresetSettings(
+      settings.defaultStoredSettings,
+      "quiet",
+      true,
+    );
+
+    expect(preset.monitorTerminal).toBe(true);
+    expect(preset.showVisualNotifications).toBe(true);
+    expect(preset.quietHoursEnabled).toBe(true);
+    expect(preset.diagnosticsCooldownMs).toBe(5000);
+  });
+
+  it("disables terminal monitoring in presets when the host does not support it", async () => {
+    const settings = await loadSettingsModule();
+
+    const preset = settings.createPresetSettings(
+      settings.defaultStoredSettings,
+      "aggressive",
+      false,
+    );
+
+    expect(preset.monitorTerminal).toBe(false);
+    expect(preset.showVisualNotifications).toBe(true);
+    expect(preset.diagnosticsSeverity).toBe("warningAndError");
   });
 });

@@ -90,7 +90,7 @@ function resolveCustomSoundPath(input: string): string {
 
   const withExpandedHome =
     trimmed === "~"
-      ? process.env.HOME ?? trimmed
+      ? (process.env.HOME ?? trimmed)
       : trimmed.startsWith("~/")
         ? path.join(process.env.HOME ?? "~", trimmed.slice(2))
         : trimmed;
@@ -105,7 +105,9 @@ export function resolveSoundPath(
   context: vscode.ExtensionContext,
   settings?: Pick<StoredSettings, "customSoundPath">,
 ): string {
-  const defaultSoundPath = context.asAbsolutePath(path.join("media", fixedSoundFile));
+  const defaultSoundPath = context.asAbsolutePath(
+    path.join("media", fixedSoundFile),
+  );
   const rawCustomSoundPath = settings?.customSoundPath?.trim() ?? "";
   if (rawCustomSoundPath.length > 0) {
     const resolvedCustomSoundPath = resolveCustomSoundPath(rawCustomSoundPath);
@@ -113,7 +115,10 @@ export function resolveSoundPath(
       return resolvedCustomSoundPath;
     }
 
-    showInvalidCustomSoundFallbackWarning(rawCustomSoundPath, resolvedCustomSoundPath);
+    showInvalidCustomSoundFallbackWarning(
+      rawCustomSoundPath,
+      resolvedCustomSoundPath,
+    );
   }
 
   if (!fs.existsSync(defaultSoundPath)) {

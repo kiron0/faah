@@ -49,6 +49,7 @@ function createStoredSettings(enabled: boolean): StoredSettings {
     diagnosticsCooldownMs: 1500,
     patternMode: "override",
     volumePercent: 70,
+    showVisualNotifications: false,
     customSoundPath: "",
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
@@ -70,6 +71,7 @@ function createRuntimeSettings(stored: StoredSettings): RuntimeSettings {
     terminalCooldownMs: stored.terminalCooldownMs,
     diagnosticsCooldownMs: stored.diagnosticsCooldownMs,
     volumePercent: stored.volumePercent,
+    showVisualNotifications: stored.showVisualNotifications,
     customSoundPath: stored.customSoundPath,
     quietHoursEnabled: stored.quietHoursEnabled,
     quietHoursStart: stored.quietHoursStart,
@@ -151,7 +153,9 @@ async function loadExtensionHarness(
               },
             ),
             onDidEndTerminalShellExecution: vi.fn(
-              (cb: (event: { execution: unknown; exitCode?: number }) => void) => {
+              (
+                cb: (event: { execution: unknown; exitCode?: number }) => void,
+              ) => {
                 endHandler = cb;
                 return endDisposable;
               },
@@ -221,6 +225,7 @@ async function loadExtensionHarness(
         _getStored: () => StoredSettings,
         _applySettings: (next: StoredSettings) => Promise<void>,
         _playTestSound: (next: StoredSettings) => void,
+        _terminalMonitoringSupported: boolean,
         _commandId: string,
       ) => settingsDisposable,
     ),
@@ -235,6 +240,15 @@ async function loadExtensionHarness(
   const extension = await import("../../src/extension");
   const context = {
     subscriptions: [] as Array<{ dispose: () => void }>,
+    extension: {
+      packageJSON: {
+        version: "0.1.8",
+      },
+    },
+    globalState: {
+      get: vi.fn(() => undefined),
+      update: vi.fn(async () => undefined),
+    },
   };
 
   return {
@@ -273,13 +287,16 @@ describe("extension smoke tests", () => {
     const textDocumentHandler = harness.getTextDocumentHandler();
     const diagnosticsHandler = harness.getDiagnosticsHandler();
 
-    expect(harness.context.subscriptions).toHaveLength(16);
+    expect(harness.context.subscriptions).toHaveLength(17);
     expect(startHandler).toBeTypeOf("function");
     expect(endHandler).toBeTypeOf("function");
     expect(activeEditorHandler).toBeTypeOf("function");
     expect(textDocumentHandler).toBeTypeOf("function");
     expect(diagnosticsHandler).toBeTypeOf("function");
     expect(harness.commandHandlers.has("faah.playTestSound")).toBe(true);
+    expect(harness.commandHandlers.has("faah.showCompatibilityStatus")).toBe(
+      true,
+    );
     expect(harness.commandHandlers.has("faah.showQuickActions")).toBe(true);
     expect(harness.commandHandlers.has("faah.openSettingsUI")).toBe(false);
     expect(harness.commandHandlers.has("faah.snoozeAlerts")).toBe(true);
@@ -337,7 +354,7 @@ describe("extension smoke tests", () => {
     const textDocumentHandler = harness.getTextDocumentHandler();
     const diagnosticsHandler = harness.getDiagnosticsHandler();
 
-    expect(harness.context.subscriptions).toHaveLength(14);
+    expect(harness.context.subscriptions).toHaveLength(15);
     expect(harness.getStartHandler()).toBeUndefined();
     expect(harness.getEndHandler()).toBeUndefined();
     expect(activeEditorHandler).toBeTypeOf("function");

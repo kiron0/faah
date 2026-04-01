@@ -28,6 +28,7 @@ function createSettings(
     terminalCooldownMs: 0,
     diagnosticsCooldownMs: 0,
     volumePercent: 70,
+    showVisualNotifications: false,
     customSoundPath: "",
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
@@ -44,6 +45,7 @@ async function loadExecutionMonitor() {
   vi.resetModules();
   const playAlert = vi.fn();
 
+  vi.doMock("vscode", () => ({ window: { showWarningMessage: vi.fn() } }));
   vi.doMock("../../src/audio", () => ({ playAlert }));
   const executionMonitor = await import("../../src/execution-monitor");
 

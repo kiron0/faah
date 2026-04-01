@@ -5,6 +5,7 @@ const configurationSection = "faah";
 const minCooldownMs = 500;
 const patternModes = ["override", "append"] as const;
 const diagnosticsSeverityModes = ["error", "warningAndError"] as const;
+const settingsPresetIds = ["balanced", "quiet", "aggressive"] as const;
 const quietHoursTimeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const defaultPatterns = [
@@ -42,10 +43,13 @@ const defaultExcludePatterns = [
   "^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\([^)]+\\))?!?:\\s.+$",
 ] as const;
 
-const defaultCompiledPatterns = defaultPatterns.map((pattern) => new RegExp(pattern, "i"));
+const defaultCompiledPatterns = defaultPatterns.map(
+  (pattern) => new RegExp(pattern, "i"),
+);
 
 export type PatternMode = (typeof patternModes)[number];
 export type DiagnosticsSeverityMode = (typeof diagnosticsSeverityModes)[number];
+export type SettingsPresetId = (typeof settingsPresetIds)[number];
 
 export type StoredSettings = {
   enabled: boolean;
@@ -57,6 +61,7 @@ export type StoredSettings = {
   diagnosticsCooldownMs: number;
   patternMode: PatternMode;
   volumePercent: number;
+  showVisualNotifications: boolean;
   customSoundPath: string;
   quietHoursEnabled: boolean;
   quietHoursStart: string;
@@ -74,6 +79,7 @@ export type RuntimeSettings = {
   terminalCooldownMs: number;
   diagnosticsCooldownMs: number;
   volumePercent: number;
+  showVisualNotifications: boolean;
   customSoundPath: string;
   quietHoursEnabled: boolean;
   quietHoursStart: string;
@@ -92,6 +98,7 @@ export const defaultStoredSettings: StoredSettings = {
   diagnosticsCooldownMs: 1500,
   patternMode: "override",
   volumePercent: 70,
+  showVisualNotifications: false,
   customSoundPath: "",
   quietHoursEnabled: false,
   quietHoursStart: "22:00",
@@ -112,10 +119,15 @@ function parseEnum<T extends string>(
   fallback: T,
 ): T {
   if (!value) return fallback;
-  return (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
+  return (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : fallback;
 }
 
-function compileRegexList(rawPatterns: readonly string[], kind: "pattern" | "exclude"): RegExp[] {
+function compileRegexList(
+  rawPatterns: readonly string[],
+  kind: "pattern" | "exclude",
+): RegExp[] {
   return rawPatterns
     .map((pattern) => {
       try {
@@ -144,35 +156,49 @@ function readConfigurationOverride<T>(
 ): T | undefined {
   const inspected = config.inspect<T>(key);
   if (!inspected) return undefined;
-  if (inspected.workspaceFolderValue !== undefined) return inspected.workspaceFolderValue;
+  if (inspected.workspaceFolderValue !== undefined)
+    return inspected.workspaceFolderValue;
   if (inspected.workspaceValue !== undefined) return inspected.workspaceValue;
   if (inspected.globalValue !== undefined) return inspected.globalValue;
   return undefined;
 }
 
-function resolveConfigurationTarget(target: SettingsPersistTarget): vscode.ConfigurationTarget {
+function resolveConfigurationTarget(
+  target: SettingsPersistTarget,
+): vscode.ConfigurationTarget {
   const hasWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
-  if (target === "workspace" && hasWorkspace) return vscode.ConfigurationTarget.Workspace;
-  if (target === "workspace" && !hasWorkspace) return vscode.ConfigurationTarget.Global;
+  if (target === "workspace" && hasWorkspace)
+    return vscode.ConfigurationTarget.Workspace;
+  if (target === "workspace" && !hasWorkspace)
+    return vscode.ConfigurationTarget.Global;
   if (target === "auto") return vscode.ConfigurationTarget.Global;
   return vscode.ConfigurationTarget.Global;
 }
 
-export function normalizeStoredSettings(input: Partial<StoredSettings> | undefined): StoredSettings {
+export function normalizeStoredSettings(
+  input: Partial<StoredSettings> | undefined,
+): StoredSettings {
   const source = input ?? {};
   const fallbackCooldownMs = Math.max(
-    typeof source.cooldownMs === "number" ? source.cooldownMs : defaultStoredSettings.cooldownMs,
+    typeof source.cooldownMs === "number"
+      ? source.cooldownMs
+      : defaultStoredSettings.cooldownMs,
     minCooldownMs,
   );
   const rawPatterns = Array.isArray(source.patterns)
     ? source.patterns.filter((item): item is string => typeof item === "string")
     : [...defaultPatterns];
   const rawExcludePatterns = Array.isArray(source.excludePatterns)
-    ? source.excludePatterns.filter((item): item is string => typeof item === "string")
+    ? source.excludePatterns.filter(
+        (item): item is string => typeof item === "string",
+      )
     : [...defaultExcludePatterns];
 
   return {
-    enabled: typeof source.enabled === "boolean" ? source.enabled : defaultStoredSettings.enabled,
+    enabled:
+      typeof source.enabled === "boolean"
+        ? source.enabled
+        : defaultStoredSettings.enabled,
     monitorTerminal:
       typeof source.monitorTerminal === "boolean"
         ? source.monitorTerminal
@@ -188,7 +214,9 @@ export function normalizeStoredSettings(input: Partial<StoredSettings> | undefin
     ),
     cooldownMs: fallbackCooldownMs,
     terminalCooldownMs: Math.max(
-      typeof source.terminalCooldownMs === "number" ? source.terminalCooldownMs : fallbackCooldownMs,
+      typeof source.terminalCooldownMs === "number"
+        ? source.terminalCooldownMs
+        : fallbackCooldownMs,
       minCooldownMs,
     ),
     diagnosticsCooldownMs: Math.max(
@@ -197,7 +225,11 @@ export function normalizeStoredSettings(input: Partial<StoredSettings> | undefin
         : fallbackCooldownMs,
       minCooldownMs,
     ),
-    patternMode: parseEnum(source.patternMode, patternModes, defaultStoredSettings.patternMode),
+    patternMode: parseEnum(
+      source.patternMode,
+      patternModes,
+      defaultStoredSettings.patternMode,
+    ),
     volumePercent: clamp(
       typeof source.volumePercent === "number"
         ? source.volumePercent
@@ -205,6 +237,10 @@ export function normalizeStoredSettings(input: Partial<StoredSettings> | undefin
       0,
       100,
     ),
+    showVisualNotifications:
+      typeof source.showVisualNotifications === "boolean"
+        ? source.showVisualNotifications
+        : defaultStoredSettings.showVisualNotifications,
     customSoundPath:
       typeof source.customSoundPath === "string"
         ? source.customSoundPath.trim()
@@ -213,9 +249,17 @@ export function normalizeStoredSettings(input: Partial<StoredSettings> | undefin
       typeof source.quietHoursEnabled === "boolean"
         ? source.quietHoursEnabled
         : defaultStoredSettings.quietHoursEnabled,
-    quietHoursStart: normalizeQuietHoursTime(source.quietHoursStart, defaultStoredSettings.quietHoursStart),
-    quietHoursEnd: normalizeQuietHoursTime(source.quietHoursEnd, defaultStoredSettings.quietHoursEnd),
-    patterns: rawPatterns.map((pattern) => pattern.trim()).filter((pattern) => pattern.length > 0),
+    quietHoursStart: normalizeQuietHoursTime(
+      source.quietHoursStart,
+      defaultStoredSettings.quietHoursStart,
+    ),
+    quietHoursEnd: normalizeQuietHoursTime(
+      source.quietHoursEnd,
+      defaultStoredSettings.quietHoursEnd,
+    ),
+    patterns: rawPatterns
+      .map((pattern) => pattern.trim())
+      .filter((pattern) => pattern.length > 0),
     excludePatterns: rawExcludePatterns
       .map((pattern) => pattern.trim())
       .filter((pattern) => pattern.length > 0),
@@ -241,6 +285,7 @@ export function toRuntimeSettings(stored: StoredSettings): RuntimeSettings {
     terminalCooldownMs: stored.terminalCooldownMs,
     diagnosticsCooldownMs: stored.diagnosticsCooldownMs,
     volumePercent: stored.volumePercent,
+    showVisualNotifications: stored.showVisualNotifications,
     customSoundPath: stored.customSoundPath,
     quietHoursEnabled: stored.quietHoursEnabled,
     quietHoursStart: stored.quietHoursStart,
@@ -250,8 +295,11 @@ export function toRuntimeSettings(stored: StoredSettings): RuntimeSettings {
   };
 }
 
-export function loadStoredSettings(context: vscode.ExtensionContext): StoredSettings {
-  const legacySaved = context.globalState.get<Partial<StoredSettings>>(settingsStorageKey);
+export function loadStoredSettings(
+  context: vscode.ExtensionContext,
+): StoredSettings {
+  const legacySaved =
+    context.globalState.get<Partial<StoredSettings>>(settingsStorageKey);
   const config = vscode.workspace.getConfiguration(configurationSection);
 
   const configOverrides: Partial<StoredSettings> = {};
@@ -259,47 +307,99 @@ export function loadStoredSettings(context: vscode.ExtensionContext): StoredSett
   const enabled = readConfigurationOverride<boolean>(config, "enabled");
   if (enabled !== undefined) configOverrides.enabled = enabled;
 
-  const monitorTerminal = readConfigurationOverride<boolean>(config, "monitorTerminal");
-  if (monitorTerminal !== undefined) configOverrides.monitorTerminal = monitorTerminal;
-
-  const monitorDiagnostics = readConfigurationOverride<boolean>(config, "monitorDiagnostics");
-  if (monitorDiagnostics !== undefined) configOverrides.monitorDiagnostics = monitorDiagnostics;
-
-  const diagnosticsSeverity = readConfigurationOverride<DiagnosticsSeverityMode>(
+  const monitorTerminal = readConfigurationOverride<boolean>(
     config,
-    "diagnosticsSeverity",
+    "monitorTerminal",
   );
-  if (diagnosticsSeverity !== undefined) configOverrides.diagnosticsSeverity = diagnosticsSeverity;
+  if (monitorTerminal !== undefined)
+    configOverrides.monitorTerminal = monitorTerminal;
+
+  const monitorDiagnostics = readConfigurationOverride<boolean>(
+    config,
+    "monitorDiagnostics",
+  );
+  if (monitorDiagnostics !== undefined)
+    configOverrides.monitorDiagnostics = monitorDiagnostics;
+
+  const diagnosticsSeverity =
+    readConfigurationOverride<DiagnosticsSeverityMode>(
+      config,
+      "diagnosticsSeverity",
+    );
+  if (diagnosticsSeverity !== undefined)
+    configOverrides.diagnosticsSeverity = diagnosticsSeverity;
 
   const cooldownMs = readConfigurationOverride<number>(config, "cooldownMs");
   if (cooldownMs !== undefined) configOverrides.cooldownMs = cooldownMs;
-  const terminalCooldownMs = readConfigurationOverride<number>(config, "terminalCooldownMs");
-  if (terminalCooldownMs !== undefined) configOverrides.terminalCooldownMs = terminalCooldownMs;
-  const diagnosticsCooldownMs = readConfigurationOverride<number>(config, "diagnosticsCooldownMs");
-  if (diagnosticsCooldownMs !== undefined) configOverrides.diagnosticsCooldownMs = diagnosticsCooldownMs;
+  const terminalCooldownMs = readConfigurationOverride<number>(
+    config,
+    "terminalCooldownMs",
+  );
+  if (terminalCooldownMs !== undefined)
+    configOverrides.terminalCooldownMs = terminalCooldownMs;
+  const diagnosticsCooldownMs = readConfigurationOverride<number>(
+    config,
+    "diagnosticsCooldownMs",
+  );
+  if (diagnosticsCooldownMs !== undefined)
+    configOverrides.diagnosticsCooldownMs = diagnosticsCooldownMs;
 
-  const patternMode = readConfigurationOverride<PatternMode>(config, "patternMode");
+  const patternMode = readConfigurationOverride<PatternMode>(
+    config,
+    "patternMode",
+  );
   if (patternMode !== undefined) configOverrides.patternMode = patternMode;
 
-  const volumePercent = readConfigurationOverride<number>(config, "volumePercent");
-  if (volumePercent !== undefined) configOverrides.volumePercent = volumePercent;
-  const customSoundPath = readConfigurationOverride<string>(config, "customSoundPath");
-  if (customSoundPath !== undefined) configOverrides.customSoundPath = customSoundPath;
+  const volumePercent = readConfigurationOverride<number>(
+    config,
+    "volumePercent",
+  );
+  if (volumePercent !== undefined)
+    configOverrides.volumePercent = volumePercent;
+  const showVisualNotifications = readConfigurationOverride<boolean>(
+    config,
+    "showVisualNotifications",
+  );
+  if (showVisualNotifications !== undefined) {
+    configOverrides.showVisualNotifications = showVisualNotifications;
+  }
+  const customSoundPath = readConfigurationOverride<string>(
+    config,
+    "customSoundPath",
+  );
+  if (customSoundPath !== undefined)
+    configOverrides.customSoundPath = customSoundPath;
 
-  const quietHoursEnabled = readConfigurationOverride<boolean>(config, "quietHoursEnabled");
-  if (quietHoursEnabled !== undefined) configOverrides.quietHoursEnabled = quietHoursEnabled;
+  const quietHoursEnabled = readConfigurationOverride<boolean>(
+    config,
+    "quietHoursEnabled",
+  );
+  if (quietHoursEnabled !== undefined)
+    configOverrides.quietHoursEnabled = quietHoursEnabled;
 
-  const quietHoursStart = readConfigurationOverride<string>(config, "quietHoursStart");
-  if (quietHoursStart !== undefined) configOverrides.quietHoursStart = quietHoursStart;
+  const quietHoursStart = readConfigurationOverride<string>(
+    config,
+    "quietHoursStart",
+  );
+  if (quietHoursStart !== undefined)
+    configOverrides.quietHoursStart = quietHoursStart;
 
-  const quietHoursEnd = readConfigurationOverride<string>(config, "quietHoursEnd");
-  if (quietHoursEnd !== undefined) configOverrides.quietHoursEnd = quietHoursEnd;
+  const quietHoursEnd = readConfigurationOverride<string>(
+    config,
+    "quietHoursEnd",
+  );
+  if (quietHoursEnd !== undefined)
+    configOverrides.quietHoursEnd = quietHoursEnd;
 
   const patterns = readConfigurationOverride<string[]>(config, "patterns");
   if (patterns !== undefined) configOverrides.patterns = patterns;
 
-  const excludePatterns = readConfigurationOverride<string[]>(config, "excludePatterns");
-  if (excludePatterns !== undefined) configOverrides.excludePatterns = excludePatterns;
+  const excludePatterns = readConfigurationOverride<string[]>(
+    config,
+    "excludePatterns",
+  );
+  if (excludePatterns !== undefined)
+    configOverrides.excludePatterns = excludePatterns;
 
   const hasConfigOverrides = Object.keys(configOverrides).length > 0;
   if (!hasConfigOverrides) return normalizeStoredSettings(legacySaved);
@@ -319,21 +419,121 @@ export async function persistStoredSettings(
 
   await Promise.all([
     config.update("enabled", settings.enabled, configurationTarget),
-    config.update("monitorTerminal", settings.monitorTerminal, configurationTarget),
-    config.update("monitorDiagnostics", settings.monitorDiagnostics, configurationTarget),
-    config.update("diagnosticsSeverity", settings.diagnosticsSeverity, configurationTarget),
+    config.update(
+      "monitorTerminal",
+      settings.monitorTerminal,
+      configurationTarget,
+    ),
+    config.update(
+      "monitorDiagnostics",
+      settings.monitorDiagnostics,
+      configurationTarget,
+    ),
+    config.update(
+      "diagnosticsSeverity",
+      settings.diagnosticsSeverity,
+      configurationTarget,
+    ),
     config.update("cooldownMs", settings.cooldownMs, configurationTarget),
-    config.update("terminalCooldownMs", settings.terminalCooldownMs, configurationTarget),
-    config.update("diagnosticsCooldownMs", settings.diagnosticsCooldownMs, configurationTarget),
+    config.update(
+      "terminalCooldownMs",
+      settings.terminalCooldownMs,
+      configurationTarget,
+    ),
+    config.update(
+      "diagnosticsCooldownMs",
+      settings.diagnosticsCooldownMs,
+      configurationTarget,
+    ),
     config.update("patternMode", settings.patternMode, configurationTarget),
     config.update("volumePercent", settings.volumePercent, configurationTarget),
-    config.update("customSoundPath", settings.customSoundPath, configurationTarget),
-    config.update("quietHoursEnabled", settings.quietHoursEnabled, configurationTarget),
-    config.update("quietHoursStart", settings.quietHoursStart, configurationTarget),
+    config.update(
+      "showVisualNotifications",
+      settings.showVisualNotifications,
+      configurationTarget,
+    ),
+    config.update(
+      "customSoundPath",
+      settings.customSoundPath,
+      configurationTarget,
+    ),
+    config.update(
+      "quietHoursEnabled",
+      settings.quietHoursEnabled,
+      configurationTarget,
+    ),
+    config.update(
+      "quietHoursStart",
+      settings.quietHoursStart,
+      configurationTarget,
+    ),
     config.update("quietHoursEnd", settings.quietHoursEnd, configurationTarget),
     config.update("patterns", settings.patterns, configurationTarget),
-    config.update("excludePatterns", settings.excludePatterns, configurationTarget),
+    config.update(
+      "excludePatterns",
+      settings.excludePatterns,
+      configurationTarget,
+    ),
   ]);
 
   await context.globalState.update(settingsStorageKey, settings);
+}
+
+export function createPresetSettings(
+  baseSettings: StoredSettings,
+  presetId: SettingsPresetId,
+  terminalMonitoringSupported = true,
+): StoredSettings {
+  const base = normalizeStoredSettings(baseSettings);
+  const monitorTerminal = terminalMonitoringSupported;
+
+  switch (presetId) {
+    case "quiet":
+      return {
+        ...base,
+        enabled: true,
+        monitorTerminal,
+        monitorDiagnostics: true,
+        diagnosticsSeverity: "error",
+        cooldownMs: 5000,
+        terminalCooldownMs: 4500,
+        diagnosticsCooldownMs: 5000,
+        volumePercent: 45,
+        showVisualNotifications: true,
+        quietHoursEnabled: true,
+        quietHoursStart: "22:00",
+        quietHoursEnd: "07:00",
+      };
+    case "aggressive":
+      return {
+        ...base,
+        enabled: true,
+        monitorTerminal,
+        monitorDiagnostics: true,
+        diagnosticsSeverity: "warningAndError",
+        cooldownMs: 700,
+        terminalCooldownMs: 700,
+        diagnosticsCooldownMs: 700,
+        volumePercent: 90,
+        showVisualNotifications: true,
+        quietHoursEnabled: false,
+      };
+    case "balanced":
+    default:
+      return {
+        ...base,
+        enabled: true,
+        monitorTerminal,
+        monitorDiagnostics: true,
+        diagnosticsSeverity: "error",
+        cooldownMs: 1500,
+        terminalCooldownMs: 1500,
+        diagnosticsCooldownMs: 1500,
+        volumePercent: 70,
+        showVisualNotifications: false,
+        quietHoursEnabled: false,
+        quietHoursStart: "22:00",
+        quietHoursEnd: "07:00",
+      };
+  }
 }

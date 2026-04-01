@@ -1,7 +1,7 @@
 {
   "name": "faah",
   "displayName": "Faah - Error Alerts",
-  "description": "Never miss errors in VS Code. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.",
+  "description": "Never miss errors in your editor. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.",
   "icon": "images/icon.png",
   "version": "0.1.7",
   "publisher": "thk",
@@ -11,6 +11,9 @@
     "url": "https://github.com/kiron0/faah"
   },
   "homepage": "https://faah.js.org",
+  "bugs": {
+    "url": "https://github.com/kiron0/faah/issues"
+  },
   "engines": {
     "vscode": "^1.105.0"
   },
@@ -28,7 +31,10 @@
     "quick actions",
     "regex",
     "debugging",
+    "audio",
     "sound",
+    "cursor",
+    "problem alerts",
     "developer productivity",
     "vscode alerts"
   ],
@@ -51,6 +57,11 @@
       {
         "command": "faah.playTestSound",
         "title": "Play Test Sound",
+        "category": "Faah"
+      },
+      {
+        "command": "faah.showCompatibilityStatus",
+        "title": "Show Compatibility Status",
         "category": "Faah"
       },
       {
@@ -138,6 +149,12 @@
           "maximum": 100,
           "scope": "resource",
           "description": "Playback volume percentage."
+        },
+        "faah.showVisualNotifications": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Show a warning popup when Faah detects an issue."
         },
         "faah.customSoundPath": {
           "type": "string",
@@ -227,7 +244,8 @@
     "test:integration": "vitest run tests/integration",
     "test:smoke": "vitest run tests/smoke",
     "vscode:prepublish": "npm run compile",
-    "package": "vsce package --no-yarn"
+    "package": "vsce package --no-yarn",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
   },
   "dependencies": {
     "play-sound": "^1.1.6"
@@ -237,6 +255,7 @@
     "@types/play-sound": "^1.1.2",
     "@types/vscode": "1.105.0",
     "@vscode/vsce": "^3.7.1",
+    "prettier": "^3.8.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }

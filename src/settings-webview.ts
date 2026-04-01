@@ -1,15 +1,19 @@
+import * as fs from "fs/promises";
 import * as vscode from "vscode";
 
 import { commandIds } from "./commands";
 import {
+  createPresetSettings,
   defaultStoredSettings,
   normalizeStoredSettings,
   type SettingsPersistTarget,
+  type SettingsPresetId,
   type StoredSettings,
 } from "./settings";
 
 function getNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let value = "";
   for (let i = 0; i < 32; i += 1) {
     value += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -22,10 +26,16 @@ function renderSettingsWebview(
   context: vscode.ExtensionContext,
   settings: StoredSettings,
   hasWorkspace: boolean,
+  terminalMonitoringSupported: boolean,
 ): string {
   const nonce = getNonce();
-  const iconUri = webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, "images", "icon.png"));
+  const iconUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(context.extensionUri, "images", "icon.png"),
+  );
   const bootSettings = JSON.stringify(settings).replace(/</g, "\\u003c");
+  const terminalStatusMessage = terminalMonitoringSupported
+    ? "Terminal monitoring is available in this host."
+    : "Terminal monitoring is unavailable in this host. Diagnostics alerts still work normally.";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -131,6 +141,12 @@ function renderSettingsWebview(
       background: rgba(255, 111, 111, 0.16);
     }
 
+    .pill.warn {
+      border-color: rgba(255, 208, 117, 0.46);
+      color: #ffefc9;
+      background: rgba(255, 208, 117, 0.16);
+    }
+
     .grid {
       padding: 22px;
       display: grid;
@@ -147,6 +163,11 @@ function renderSettingsWebview(
 
     .card.full {
       grid-column: 1 / -1;
+    }
+
+    .card.notice {
+      background: linear-gradient(120deg, rgba(255, 208, 117, 0.12), rgba(91, 182, 255, 0.09));
+      border-color: rgba(255, 208, 117, 0.24);
     }
 
     label {
@@ -412,6 +433,13 @@ function renderSettingsWebview(
       filter: brightness(1.04);
     }
 
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+      filter: none;
+    }
+
     button.secondary {
       color: var(--text);
       background: rgba(255, 255, 255, 0.08);
@@ -467,6 +495,14 @@ function renderSettingsWebview(
     </section>
 
     <section class="grid">
+      <article class="card full notice">
+        <label>Host Compatibility</label>
+        <div class="hint">${terminalStatusMessage}</div>
+        <div class="button-row">
+          <button class="secondary" id="compatibilityBtn" type="button">Show Compatibility Status</button>
+        </div>
+      </article>
+
       <article class="card full">
         <div class="row">
           <div>
@@ -482,9 +518,15 @@ function renderSettingsWebview(
         <div class="row">
           <div>
             <div>Terminal Output</div>
-            <div class="hint">Play alerts for terminal command output.</div>
+            <div class="hint">${
+              terminalMonitoringSupported
+                ? "Play alerts for terminal command output."
+                : "Unavailable in this host. Your saved preference is preserved, but runtime monitoring is disabled here."
+            }</div>
           </div>
-          <button id="monitorTerminalSwitch" class="switch" type="button" aria-label="Toggle terminal monitoring"><span></span></button>
+          <button id="monitorTerminalSwitch" class="switch" type="button" aria-label="Toggle terminal monitoring" ${
+            terminalMonitoringSupported ? "" : "disabled"
+          }><span></span></button>
         </div>
         <div class="row" style="margin-top: 10px;">
           <div>
@@ -528,6 +570,17 @@ function renderSettingsWebview(
       </article>
 
       <article class="card">
+        <label>Visual Alerts</label>
+        <div class="row">
+          <div>
+            <div>Popup notifications</div>
+            <div class="hint">Show a visual warning when Faah detects an issue.</div>
+          </div>
+          <button id="visualAlertsSwitch" class="switch" type="button" aria-label="Toggle visual alerts"><span></span></button>
+        </div>
+      </article>
+
+      <article class="card">
         <label for="saveTarget">Save Scope</label>
         <select id="saveTarget" aria-label="Save scope">
           <option value="global" selected>User (Global)</option>
@@ -536,7 +589,7 @@ function renderSettingsWebview(
         <div class="hint">
           ${
             hasWorkspace
-              ? "Choose where settings are stored when you click Save Changes."
+              ? "Choose where auto-saved settings should be stored."
               : "No workspace open. Settings will be saved to user settings."
           }
         </div>
@@ -558,7 +611,7 @@ function renderSettingsWebview(
         </div>
       </article>
 
-      <article class="card">
+      <article class="card full">
         <label>Custom Sound (optional)</label>
         <div id="customSoundPathDisplay" class="path-display" role="status" aria-live="polite"></div>
         <div class="hint">Upload/select a sound file to override default playback.</div>
@@ -606,18 +659,36 @@ function renderSettingsWebview(
         <ul id="invalidPatternList" class="validation-list hidden" aria-label="Invalid custom patterns"></ul>
         <ul id="invalidExcludePatternList" class="validation-list hidden" aria-label="Invalid exclude patterns"></ul>
       </article>
+
+      <article class="card full">
+        <label>Settings Backup</label>
+        <div class="hint">Export your current Faah setup to JSON or import it on another machine.</div>
+        <div class="button-row">
+          <button class="secondary" id="exportSettingsBtn" type="button">Export Settings</button>
+          <button class="secondary" id="importSettingsBtn" type="button">Import Settings</button>
+        </div>
+      </article>
+
+        <article class="card">
+        <label>Quick Presets</label>
+        <div class="hint">Apply a ready-made profile without changing your custom sound or regex lists.</div>
+        <div class="button-row">
+          <button class="secondary" id="presetBalancedBtn" type="button">Balanced</button>
+          <button class="secondary" id="presetQuietBtn" type="button">Quiet</button>
+          <button class="secondary" id="presetAggressiveBtn" type="button">Aggressive</button>
+        </div>
+      </article>
     </section>
 
     <section class="actions">
       <div id="status" class="status" role="status" aria-live="polite"></div>
       <button class="ghost" id="resetBtn" type="button">Reset Defaults</button>
       <button class="secondary" id="testBtn" type="button">Play Test Sound</button>
-      <button id="saveBtn" type="button">Save Changes</button>
     </section>
 
     <section class="credit-footer" aria-label="Credits">
       <div><strong>Developed by:</strong> Toufiq Hasan Kiron</div>
-      <div><strong>Idea:</strong> Md Shoaib Taimur</div>
+      <div><strong>Concept:</strong> Md Shoaib Taimur</div>
     </section>
   </div>
 
@@ -626,8 +697,10 @@ function renderSettingsWebview(
     const defaults = ${JSON.stringify(defaultStoredSettings).replace(/</g, "\\u003c")};
     const initial = ${bootSettings};
     const hasWorkspace = ${JSON.stringify(hasWorkspace)};
+    const terminalMonitoringSupported = ${JSON.stringify(terminalMonitoringSupported)};
 
     const ui = {
+      compatibilityBtn: document.getElementById("compatibilityBtn"),
       enabledSwitch: document.getElementById("enabledSwitch"),
       monitorTerminalSwitch: document.getElementById("monitorTerminalSwitch"),
       monitorDiagnosticsSwitch: document.getElementById("monitorDiagnosticsSwitch"),
@@ -638,12 +711,16 @@ function renderSettingsWebview(
       diagnosticsCooldownLabel: document.getElementById("diagnosticsCooldownLabel"),
       volumePercent: document.getElementById("volumePercent"),
       volumeLabel: document.getElementById("volumeLabel"),
+      visualAlertsSwitch: document.getElementById("visualAlertsSwitch"),
       customSoundPathDisplay: document.getElementById("customSoundPathDisplay"),
       uploadSoundBtn: document.getElementById("uploadSoundBtn"),
       useDefaultSoundBtn: document.getElementById("useDefaultSoundBtn"),
       quietHoursSwitch: document.getElementById("quietHoursSwitch"),
       quietHoursStart: document.getElementById("quietHoursStart"),
       quietHoursEnd: document.getElementById("quietHoursEnd"),
+      presetBalancedBtn: document.getElementById("presetBalancedBtn"),
+      presetQuietBtn: document.getElementById("presetQuietBtn"),
+      presetAggressiveBtn: document.getElementById("presetAggressiveBtn"),
       patternModeOverride: document.getElementById("patternModeOverride"),
       patternModeAppend: document.getElementById("patternModeAppend"),
       patterns: document.getElementById("patterns"),
@@ -654,7 +731,8 @@ function renderSettingsWebview(
       appendReadonlyWrap: document.getElementById("appendReadonlyWrap"),
       builtInPatternsList: document.getElementById("builtInPatternsList"),
       saveTarget: document.getElementById("saveTarget"),
-      saveBtn: document.getElementById("saveBtn"),
+      exportSettingsBtn: document.getElementById("exportSettingsBtn"),
+      importSettingsBtn: document.getElementById("importSettingsBtn"),
       testBtn: document.getElementById("testBtn"),
       resetBtn: document.getElementById("resetBtn"),
       status: document.getElementById("status"),
@@ -667,17 +745,15 @@ function renderSettingsWebview(
     let enabled = true;
     let monitorTerminal = true;
     let monitorDiagnostics = true;
+    let showVisualNotifications = false;
     let customSoundPath = "";
     let quietHoursEnabled = false;
     let invalidRegexCount = 0;
     let statusTimer = null;
     let pillTimer = null;
     let autoSaveTimer = null;
-    let suppressNextSavedStatus = false;
     let saveInFlight = false;
-    let activeSaveMode = "manual";
-    let queuedSaveMode = null;
-    let queuedSaveForce = false;
+    let queuedSave = false;
     let latestSavedSignature = "";
 
     function setSwitchState(element, isOn) {
@@ -705,10 +781,12 @@ function renderSettingsWebview(
       enabled = !!settings.enabled;
       monitorTerminal = !!settings.monitorTerminal;
       monitorDiagnostics = !!settings.monitorDiagnostics;
+      showVisualNotifications = !!settings.showVisualNotifications;
       quietHoursEnabled = !!settings.quietHoursEnabled;
       setSwitchState(ui.enabledSwitch, enabled);
       setSwitchState(ui.monitorTerminalSwitch, monitorTerminal);
       setSwitchState(ui.monitorDiagnosticsSwitch, monitorDiagnostics);
+      setSwitchState(ui.visualAlertsSwitch, showVisualNotifications);
       setSwitchState(ui.quietHoursSwitch, quietHoursEnabled);
       ui.diagnosticsSeverity.value =
         settings.diagnosticsSeverity === "warningAndError" ? "warningAndError" : "error";
@@ -855,6 +933,7 @@ function renderSettingsWebview(
         enabled,
         monitorTerminal,
         monitorDiagnostics,
+        showVisualNotifications,
         quietHoursEnabled,
         diagnosticsSeverity:
           ui.diagnosticsSeverity.value === "warningAndError" ? "warningAndError" : "error",
@@ -908,45 +987,28 @@ function renderSettingsWebview(
       flashPill(text, kind);
     }
 
-    function queueSave(mode, force) {
-      if (mode === "manual") {
-        queuedSaveMode = "manual";
-        queuedSaveForce = true;
-        return;
-      }
-
-      if (queuedSaveMode === "manual") return;
-      queuedSaveMode = "auto";
-      queuedSaveForce = !!force;
-    }
-
     function flushQueuedSave() {
-      if (!queuedSaveMode) return;
-      const mode = queuedSaveMode;
-      const force = queuedSaveForce;
-      queuedSaveMode = null;
-      queuedSaveForce = false;
-      requestSave(mode, force);
+      if (!queuedSave) return;
+      queuedSave = false;
+      requestSave(true);
     }
 
-    function requestSave(mode = "manual", force = false, explicitPayload) {
+    function requestSave(force = false, explicitPayload) {
       const payload = explicitPayload || collectSettings();
       const signature = createSettingsSignature(payload);
-      const invalidEntriesPresent = invalidRegexCount > 0;
 
-      if (!force && mode === "auto" && invalidEntriesPresent) {
+      if (!force && invalidRegexCount > 0) {
         flashPill("Fix invalid regex entries to resume auto-save.", "error");
         return false;
       }
-      if (!force && mode === "auto" && signature === latestSavedSignature) return false;
+      if (!force && signature === latestSavedSignature) return false;
 
       if (saveInFlight) {
-        queueSave(mode, force);
+        queuedSave = true;
         return false;
       }
 
       saveInFlight = true;
-      activeSaveMode = mode;
       vscode.postMessage({ type: "save", payload, target: getPersistTarget() });
       return true;
     }
@@ -955,7 +1017,7 @@ function renderSettingsWebview(
       if (autoSaveTimer) clearTimeout(autoSaveTimer);
       autoSaveTimer = setTimeout(() => {
         autoSaveTimer = null;
-        requestSave("auto");
+        requestSave();
       }, delay);
     }
 
@@ -964,12 +1026,27 @@ function renderSettingsWebview(
       scheduleAutoSave(delay);
     }
 
+    function requestPreset(presetId) {
+      vscode.postMessage({
+        type: "applyPreset",
+        presetId,
+        target: getPersistTarget(),
+      });
+    }
+
     ui.enabledSwitch.addEventListener("click", () => {
       enabled = !enabled;
       setSwitchState(ui.enabledSwitch, enabled);
       markChanged();
     });
+    ui.compatibilityBtn.addEventListener("click", () => {
+      vscode.postMessage({ type: "showCompatibilityStatus" });
+    });
     ui.monitorTerminalSwitch.addEventListener("click", () => {
+      if (!terminalMonitoringSupported) {
+        flashStatus("Terminal monitoring is unavailable in this host.", "error");
+        return;
+      }
       monitorTerminal = !monitorTerminal;
       setSwitchState(ui.monitorTerminalSwitch, monitorTerminal);
       markChanged();
@@ -977,6 +1054,11 @@ function renderSettingsWebview(
     ui.monitorDiagnosticsSwitch.addEventListener("click", () => {
       monitorDiagnostics = !monitorDiagnostics;
       setSwitchState(ui.monitorDiagnosticsSwitch, monitorDiagnostics);
+      markChanged();
+    });
+    ui.visualAlertsSwitch.addEventListener("click", () => {
+      showVisualNotifications = !showVisualNotifications;
+      setSwitchState(ui.visualAlertsSwitch, showVisualNotifications);
       markChanged();
     });
     ui.quietHoursSwitch.addEventListener("click", () => {
@@ -1034,13 +1116,26 @@ function renderSettingsWebview(
       syncRegexValidation();
       markChanged(textAutoSaveDebounceMs);
     });
-
-    ui.saveBtn.addEventListener("click", () => {
-      if (autoSaveTimer) {
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer = null;
-      }
-      requestSave("manual", true);
+    ui.presetBalancedBtn.addEventListener("click", () => {
+      requestPreset("balanced");
+    });
+    ui.presetQuietBtn.addEventListener("click", () => {
+      requestPreset("quiet");
+    });
+    ui.presetAggressiveBtn.addEventListener("click", () => {
+      requestPreset("aggressive");
+    });
+    ui.exportSettingsBtn.addEventListener("click", () => {
+      vscode.postMessage({
+        type: "exportSettings",
+        payload: collectSettings(),
+      });
+    });
+    ui.importSettingsBtn.addEventListener("click", () => {
+      vscode.postMessage({
+        type: "importSettings",
+        target: getPersistTarget(),
+      });
     });
 
     ui.testBtn.addEventListener("click", () => {
@@ -1053,9 +1148,8 @@ function renderSettingsWebview(
         patterns: Array.isArray(defaults.patterns) ? [...defaults.patterns] : [],
         excludePatterns: Array.isArray(defaults.excludePatterns) ? [...defaults.excludePatterns] : [],
       };
-      suppressNextSavedStatus = true;
       applySettings(resetSettings);
-      requestSave("manual", true, resetSettings);
+      requestSave(true, resetSettings);
     });
 
     window.addEventListener("message", (event) => {
@@ -1067,17 +1161,8 @@ function renderSettingsWebview(
         const savedSettings = message.payload || initial;
         latestSavedSignature = createSettingsSignature(savedSettings);
         applySettings(savedSettings);
-        if (suppressNextSavedStatus) {
-          suppressNextSavedStatus = false;
-          flushQueuedSave();
-          return;
-        }
         const targetLabel = message.target === "workspace" ? "workspace" : "user";
-        if (activeSaveMode === "auto") {
-          flashStatus("Changes auto-saved to " + targetLabel + " settings");
-        } else {
-          flashStatus("Saved to " + targetLabel + " settings");
-        }
+        flashStatus("Changes auto-saved to " + targetLabel + " settings");
         flushQueuedSave();
         return;
       }
@@ -1099,11 +1184,14 @@ function renderSettingsWebview(
         return;
       }
 
+      if (message.type === "exported") {
+        flashStatus("Settings exported successfully");
+        return;
+      }
+
       if (message.type === "error") {
         saveInFlight = false;
-        queuedSaveMode = null;
-        queuedSaveForce = false;
-        suppressNextSavedStatus = false;
+        queuedSave = false;
         flashStatus(String(message.payload || "Failed to save settings"), "error");
       }
     });
@@ -1118,91 +1206,228 @@ function renderSettingsWebview(
 export function registerSettingsUiCommand(
   context: vscode.ExtensionContext,
   getStoredSettings: () => StoredSettings,
-  onSaved: (settings: StoredSettings, target: SettingsPersistTarget) => Promise<void>,
+  onSaved: (
+    settings: StoredSettings,
+    target: SettingsPersistTarget,
+  ) => Promise<void>,
   onTest: (settings: StoredSettings) => void,
+  terminalMonitoringSupported: boolean,
   commandId = commandIds.openSettingsUi,
 ): vscode.Disposable {
   let panel: vscode.WebviewPanel | undefined;
 
-  const commandDisposable = vscode.commands.registerCommand(commandId, async () => {
-    const hasWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
-    if (panel) {
-      panel.reveal(vscode.ViewColumn.One);
-      panel.webview.html = renderSettingsWebview(panel.webview, context, getStoredSettings(), hasWorkspace);
-      return;
-    }
+  const commandDisposable = vscode.commands.registerCommand(
+    commandId,
+    async () => {
+      const hasWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
+      if (panel) {
+        panel.reveal(vscode.ViewColumn.One);
+        panel.webview.html = renderSettingsWebview(
+          panel.webview,
+          context,
+          getStoredSettings(),
+          hasWorkspace,
+          terminalMonitoringSupported,
+        );
+        return;
+      }
 
-    panel = vscode.window.createWebviewPanel(
-      "faahSettings",
-      "Faah Settings",
-      vscode.ViewColumn.One,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-      },
-    );
-    const panelIconPath = vscode.Uri.joinPath(context.extensionUri, "images", "icon.png");
-    panel.iconPath = {
-      light: panelIconPath,
-      dark: panelIconPath,
-    };
+      panel = vscode.window.createWebviewPanel(
+        "faahSettings",
+        "Faah Settings",
+        vscode.ViewColumn.One,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+        },
+      );
+      const panelIconPath = vscode.Uri.joinPath(
+        context.extensionUri,
+        "images",
+        "icon.png",
+      );
+      panel.iconPath = {
+        light: panelIconPath,
+        dark: panelIconPath,
+      };
 
-    panel.webview.html = renderSettingsWebview(panel.webview, context, getStoredSettings(), hasWorkspace);
+      panel.webview.html = renderSettingsWebview(
+        panel.webview,
+        context,
+        getStoredSettings(),
+        hasWorkspace,
+        terminalMonitoringSupported,
+      );
 
-    panel.onDidDispose(() => {
-      panel = undefined;
-    });
+      panel.onDidDispose(() => {
+        panel = undefined;
+      });
 
-    panel.webview.onDidReceiveMessage(async (message) => {
-      if (!message || typeof message.type !== "string") return;
+      panel.webview.onDidReceiveMessage(async (message) => {
+        if (!message || typeof message.type !== "string") return;
 
-      if (message.type === "selectSoundFile") {
-        const selected = await vscode.window.showOpenDialog({
-          title: "Select custom Faah sound",
-          canSelectMany: false,
-          canSelectFiles: true,
-          canSelectFolders: false,
-          filters: {
-            Audio: ["wav", "mp3", "ogg", "m4a", "aac", "flac"],
-            AllFiles: ["*"],
-          },
-        });
-        const selectedPath = selected?.[0]?.fsPath;
-        if (selectedPath) {
-          panel?.webview.postMessage({ type: "selectedSoundFile", payload: selectedPath });
+        if (message.type === "selectSoundFile") {
+          const selected = await vscode.window.showOpenDialog({
+            title: "Select custom Faah sound",
+            canSelectMany: false,
+            canSelectFiles: true,
+            canSelectFolders: false,
+            filters: {
+              Audio: ["wav", "mp3", "ogg", "m4a", "aac", "flac"],
+              AllFiles: ["*"],
+            },
+          });
+          const selectedPath = selected?.[0]?.fsPath;
+          if (selectedPath) {
+            panel?.webview.postMessage({
+              type: "selectedSoundFile",
+              payload: selectedPath,
+            });
+          }
+          return;
         }
-        return;
-      }
 
-      if (message.type === "test") {
-        const normalized = normalizeStoredSettings((message.payload ?? {}) as Partial<StoredSettings>);
-        onTest(normalized);
-        return;
-      }
+        if (message.type === "test") {
+          const normalized = normalizeStoredSettings(
+            (message.payload ?? {}) as Partial<StoredSettings>,
+          );
+          onTest(normalized);
+          return;
+        }
 
-      if (message.type !== "save") return;
+        if (message.type === "showCompatibilityStatus") {
+          await vscode.commands.executeCommand(
+            commandIds.showCompatibilityStatus,
+          );
+          return;
+        }
 
-      try {
-        const normalized = normalizeStoredSettings((message.payload ?? {}) as Partial<StoredSettings>);
-        const persistTarget: SettingsPersistTarget =
-          message.target === "workspace" && hasWorkspace ? "workspace" : "global";
-        await onSaved(normalized, persistTarget);
-        panel?.webview.postMessage({ type: "saved", payload: normalized, target: persistTarget });
-      } catch (err) {
-        const messageText = err instanceof Error ? err.message : String(err);
-        panel?.webview.postMessage({ type: "error", payload: messageText });
-      }
-    });
-  });
+        if (message.type === "applyPreset") {
+          try {
+            const presetId = String(message.presetId ?? "") as SettingsPresetId;
+            const persistTarget: SettingsPersistTarget =
+              message.target === "workspace" && hasWorkspace
+                ? "workspace"
+                : "global";
+            const presetSettings = createPresetSettings(
+              getStoredSettings(),
+              presetId,
+              terminalMonitoringSupported,
+            );
+            await onSaved(presetSettings, persistTarget);
+            panel?.webview.postMessage({
+              type: "saved",
+              payload: presetSettings,
+              target: persistTarget,
+            });
+          } catch (err) {
+            const messageText =
+              err instanceof Error ? err.message : String(err);
+            panel?.webview.postMessage({ type: "error", payload: messageText });
+          }
+          return;
+        }
 
-  const configurationDisposable = vscode.workspace.onDidChangeConfiguration((event) => {
-    if (!panel) return;
-    if (!event.affectsConfiguration("faah")) return;
-    panel.webview.postMessage({
-      type: "externalSettingsUpdated",
-      payload: getStoredSettings(),
-    });
-  });
+        if (message.type === "exportSettings") {
+          try {
+            const normalized = normalizeStoredSettings(
+              (message.payload ?? {}) as Partial<StoredSettings>,
+            );
+            const targetUri = await vscode.window.showSaveDialog({
+              title: "Export Faah settings",
+              saveLabel: "Export Settings",
+              filters: {
+                JSON: ["json"],
+              },
+            });
+            if (!targetUri) return;
+
+            await fs.writeFile(
+              targetUri.fsPath,
+              `${JSON.stringify(normalized, null, 2)}\n`,
+              "utf8",
+            );
+            panel?.webview.postMessage({
+              type: "exported",
+              payload: targetUri.fsPath,
+            });
+          } catch (err) {
+            const messageText =
+              err instanceof Error ? err.message : String(err);
+            panel?.webview.postMessage({ type: "error", payload: messageText });
+          }
+          return;
+        }
+
+        if (message.type === "importSettings") {
+          try {
+            const selected = await vscode.window.showOpenDialog({
+              title: "Import Faah settings",
+              canSelectMany: false,
+              canSelectFiles: true,
+              canSelectFolders: false,
+              filters: {
+                JSON: ["json"],
+              },
+            });
+            const selectedPath = selected?.[0]?.fsPath;
+            if (!selectedPath) return;
+
+            const fileContents = await fs.readFile(selectedPath, "utf8");
+            const parsed = JSON.parse(fileContents) as Partial<StoredSettings>;
+            const normalized = normalizeStoredSettings(parsed);
+            const persistTarget: SettingsPersistTarget =
+              message.target === "workspace" && hasWorkspace
+                ? "workspace"
+                : "global";
+            await onSaved(normalized, persistTarget);
+            panel?.webview.postMessage({
+              type: "saved",
+              payload: normalized,
+              target: persistTarget,
+            });
+          } catch (err) {
+            const messageText =
+              err instanceof Error ? err.message : String(err);
+            panel?.webview.postMessage({ type: "error", payload: messageText });
+          }
+          return;
+        }
+
+        if (message.type !== "save") return;
+
+        try {
+          const normalized = normalizeStoredSettings(
+            (message.payload ?? {}) as Partial<StoredSettings>,
+          );
+          const persistTarget: SettingsPersistTarget =
+            message.target === "workspace" && hasWorkspace
+              ? "workspace"
+              : "global";
+          await onSaved(normalized, persistTarget);
+          panel?.webview.postMessage({
+            type: "saved",
+            payload: normalized,
+            target: persistTarget,
+          });
+        } catch (err) {
+          const messageText = err instanceof Error ? err.message : String(err);
+          panel?.webview.postMessage({ type: "error", payload: messageText });
+        }
+      });
+    },
+  );
+
+  const configurationDisposable = vscode.workspace.onDidChangeConfiguration(
+    (event) => {
+      if (!panel) return;
+      if (!event.affectsConfiguration("faah")) return;
+      panel.webview.postMessage({
+        type: "externalSettingsUpdated",
+        payload: getStoredSettings(),
+      });
+    },
+  );
 
   return vscode.Disposable.from(commandDisposable, configurationDisposable);
 }

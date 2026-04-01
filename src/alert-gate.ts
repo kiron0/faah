@@ -16,7 +16,10 @@ function toMinutesSinceMidnight(time: string): number {
   return hours * 60 + minutes;
 }
 
-function isNowWithinQuietHours(settings: RuntimeSettings, nowMs: number): boolean {
+function isNowWithinQuietHours(
+  settings: RuntimeSettings,
+  nowMs: number,
+): boolean {
   if (!settings.quietHoursEnabled) return false;
 
   const startMinutes = toMinutesSinceMidnight(settings.quietHoursStart);
@@ -40,8 +43,10 @@ export function getRemainingPlaybackCooldownMs(
 ): number {
   const scopedElapsedMs = nowMs - (lastPlaybackAtMsByScope.get(scope) ?? 0);
   const scopedRemainingMs = Math.max(0, cooldownMs - scopedElapsedMs);
-  const sharedElapsedMs = nowMs - (lastPlaybackAtMsByScope.get(globalScope) ?? 0);
-  const shouldApplySharedWindow = lastPlaybackScope !== null && lastPlaybackScope !== scope;
+  const sharedElapsedMs =
+    nowMs - (lastPlaybackAtMsByScope.get(globalScope) ?? 0);
+  const shouldApplySharedWindow =
+    lastPlaybackScope !== null && lastPlaybackScope !== scope;
   const sharedRemainingMs = shouldApplySharedWindow
     ? Math.max(0, sharedWindowMs - sharedElapsedMs)
     : 0;
@@ -72,9 +77,13 @@ export function getAlertSuppressionReason(
   return null;
 }
 
-export function tryAcquirePlaybackWindow(cooldownMs: number, scope = globalScope): boolean {
+export function tryAcquirePlaybackWindow(
+  cooldownMs: number,
+  scope = globalScope,
+): boolean {
   const nowMs = Date.now();
-  if (getRemainingPlaybackCooldownMs(cooldownMs, scope, nowMs) > 0) return false;
+  if (getRemainingPlaybackCooldownMs(cooldownMs, scope, nowMs) > 0)
+    return false;
   lastPlaybackAtMsByScope.set(scope, nowMs);
   lastPlaybackAtMsByScope.set(globalScope, nowMs);
   lastPlaybackScope = scope;

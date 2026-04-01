@@ -12,7 +12,8 @@ function summarizeSources(
   settings: RuntimeSettings,
   terminalMonitoringSupported: boolean,
 ): string {
-  const terminalMonitoringEnabled = settings.monitorTerminal && terminalMonitoringSupported;
+  const terminalMonitoringEnabled =
+    settings.monitorTerminal && terminalMonitoringSupported;
 
   if (terminalMonitoringEnabled && settings.monitorDiagnostics) return "T+E";
   if (terminalMonitoringEnabled) return "T";
@@ -21,7 +22,9 @@ function summarizeSources(
 }
 
 function describeDiagnosticsSeverity(settings: RuntimeSettings): string {
-  return settings.diagnosticsSeverity === "warningAndError" ? "Error + Warning" : "Error only";
+  return settings.diagnosticsSeverity === "warningAndError"
+    ? "Error + Warning"
+    : "Error only";
 }
 
 function describeQuietHours(settings: RuntimeSettings): string {
@@ -40,16 +43,29 @@ function formatSnoozeRemaining(snoozeRemainingMs: number): string {
 
 export function createStatusBarController(): {
   item: vscode.StatusBarItem;
-  update: (settings: RuntimeSettings, runtimeState?: StatusBarRuntimeState) => void;
+  update: (
+    settings: RuntimeSettings,
+    runtimeState?: StatusBarRuntimeState,
+  ) => void;
 } {
-  const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  const item = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    100,
+  );
   item.name = "Faah";
   item.command = commandIds.showQuickActions;
   item.show();
 
-  const update = (settings: RuntimeSettings, runtimeState?: StatusBarRuntimeState): void => {
-    const terminalMonitoringSupported = runtimeState?.terminalMonitoringSupported ?? true;
-    const sourceSummary = summarizeSources(settings, terminalMonitoringSupported);
+  const update = (
+    settings: RuntimeSettings,
+    runtimeState?: StatusBarRuntimeState,
+  ): void => {
+    const terminalMonitoringSupported =
+      runtimeState?.terminalMonitoringSupported ?? true;
+    const sourceSummary = summarizeSources(
+      settings,
+      terminalMonitoringSupported,
+    );
     const snoozeRemainingMs = runtimeState?.snoozeRemainingMs ?? 0;
     const isSnoozed = snoozeRemainingMs > 0;
 
@@ -62,7 +78,13 @@ export function createStatusBarController(): {
       return;
     }
 
-    item.text = isSnoozed ? "$(bell-slash) Faah Snoozed" : `$(bell) Faah ${sourceSummary}`;
+    const unsupportedTerminalBadge =
+      settings.monitorTerminal && !terminalMonitoringSupported
+        ? " $(warning)"
+        : "";
+    item.text = isSnoozed
+      ? "$(bell-slash) Faah Snoozed"
+      : `$(bell) Faah ${sourceSummary}${unsupportedTerminalBadge}`;
     item.tooltip = [
       `Sources: ${sourceSummary}`,
       `Diagnostics severity: ${describeDiagnosticsSeverity(settings)}`,
@@ -72,7 +94,9 @@ export function createStatusBarController(): {
       `Terminal cooldown: ${settings.terminalCooldownMs}ms`,
       `Diagnostics cooldown: ${settings.diagnosticsCooldownMs}ms`,
       `Quiet hours: ${describeQuietHours(settings)}`,
-      ...(isSnoozed ? [`Snooze remaining: ${formatSnoozeRemaining(snoozeRemainingMs)}`] : []),
+      ...(isSnoozed
+        ? [`Snooze remaining: ${formatSnoozeRemaining(snoozeRemainingMs)}`]
+        : []),
       "Click for quick actions.",
     ].join("\n");
   };

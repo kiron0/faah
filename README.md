@@ -1,11 +1,11 @@
 <div align="center">
   <img src="images/icon.png" alt="Faah Icon" width="140" />
 
-  # Faah - Error Alerts
+# Faah - Error Alerts
 
-  ### Your Error Drama Alarm for VS Code
+### Your Error Drama Alarm for VS Code
 
-  Never miss errors in VS Code. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.
+Never miss errors in VS Code. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.
 
   <p>
     <img src="https://img.shields.io/badge/VS%20Code-1.105.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />
@@ -46,7 +46,7 @@ If your errors get dramatic — **Faah gets louder.**
 - Snooze controls (`15m`, `30m`, `1h`, `2h`) and clear snooze
 - Quiet hours (preset or custom `HH:mm` range)
 - Workspace-aware settings (`faah.*`) with global fallback
-- Auto-save settings in the Control Room, with manual Save Changes fallback
+- Auto-save settings in the Control Room
 - Status bar indicator with source-aware quick actions
 - Fully configurable patterns
 - Works smoothly across your coding workflow
@@ -59,7 +59,7 @@ Use Faah from the status bar quick actions or Command Palette.
 
 1. In VS Code, click `Faah Off`, `Faah T`, `Faah E`, or `Faah T+E` in the bottom bar.
 2. Choose what you want: turn Faah on/off, select terminal/editor/both, switch error mode, snooze alerts, set quiet hours, play test sound, or open full settings.
-3. In Settings UI, changes auto-save after edits; `Save Changes` is still available for manual save.
+3. In Settings UI, changes auto-save after edits.
 
 Command Palette commands:
 
@@ -76,11 +76,11 @@ Command Palette commands:
 
 Faah is perfect when you:
 
-* Run long tasks
-* Work with noisy logs
-* Switch tabs while working
-* Miss subtle error messages
-* Want dramatic feedback while coding 😄
+- Run long tasks
+- Work with noisy logs
+- Switch tabs while working
+- Miss subtle error messages
+- Want dramatic feedback while coding 😄
 
 ---
 
@@ -93,9 +93,11 @@ Faah just makes sure you hear it.
 ---
 
 ## Concept Idea
+
 Md Shoaib Taimur | <a href="https://github.com/shoaibtaimur">GitHub</a>
 
 ## License
+
 MIT License © Toufiq Hasan Kiron | <a href="https://kiron.dev">Portfolio</a>
 
 ## Contributing

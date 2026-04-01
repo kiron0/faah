@@ -32,6 +32,7 @@ function createSettings(volumePercent: number): RuntimeSettings {
     terminalCooldownMs: 1500,
     diagnosticsCooldownMs: 1500,
     volumePercent,
+    showVisualNotifications: false,
     customSoundPath: "",
     quietHoursEnabled: false,
     quietHoursStart: "22:00",

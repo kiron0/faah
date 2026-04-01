@@ -18,6 +18,7 @@ function createSettings(
     terminalCooldownMs: 0,
     diagnosticsCooldownMs: 0,
     volumePercent: 70,
+    showVisualNotifications: false,
     customSoundPath: "",
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
@@ -74,6 +75,7 @@ async function loadDiagnosticsMonitorHarness() {
       activeTextEditor: {
         document: { uri: activeUri },
       },
+      showWarningMessage: vi.fn(),
     },
     languages: {
       getDiagnostics,
