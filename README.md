@@ -90,13 +90,14 @@ Faah just makes sure you hear it.
 
 ---
 
-## Concept Idea
+## Authors
 
-Md Shoaib Taimur | <a href="https://github.com/shoaibtaimur">GitHub</a>
+- [Md Shoaib Taimur](https://github.com/shoaibtaimur) (Idea)
+- [Toufiq Hasan Kiron](https://kiron.dev) (Developer)
 
 ## License
 
-MIT License © Toufiq Hasan Kiron | <a href="https://kiron.dev">Portfolio</a>
+MIT License
 
 ## Contributing
 
@@ -104,4 +105,4 @@ Contributions are welcome! Please feel free to submit an issue or a pull request
 
 ## Support
 
-If you have any questions or feedback, please feel free to contact me at <a href="mailto:hello@kiron.dev">hello@kiron.dev</a>.
+If you have any questions or feedback, please feel free to contact me at [hello@kiron.dev](mailto:hello@kiron.dev).
