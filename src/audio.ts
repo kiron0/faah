@@ -38,6 +38,10 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+function getHomeDirectory(): string | undefined {
+  return process.env.HOME ?? process.env.USERPROFILE;
+}
+
 function showMissingSoundFileWarning(soundPath: string): void {
   if (lastMissingSoundWarningPath === soundPath) return;
   lastMissingSoundWarningPath = soundPath;
@@ -65,6 +69,20 @@ function showInvalidCustomSoundFallbackWarning(
   );
 }
 
+function clearMissingSoundWarningPath(soundPath: string): void {
+  if (lastMissingSoundWarningPath === soundPath) {
+    lastMissingSoundWarningPath = null;
+  }
+}
+
+function clearInvalidCustomSoundWarningPath(
+  resolvedCustomSoundPath: string,
+): void {
+  if (lastInvalidCustomSoundWarningPath === resolvedCustomSoundPath) {
+    lastInvalidCustomSoundWarningPath = null;
+  }
+}
+
 function warnWindowsFallbackOnce(message: string): void {
   if (hasWarnedWindowsFallback) return;
   hasWarnedWindowsFallback = true;
@@ -90,9 +108,9 @@ function resolveCustomSoundPath(input: string): string {
 
   const withExpandedHome =
     trimmed === "~"
-      ? (process.env.HOME ?? trimmed)
+      ? (getHomeDirectory() ?? trimmed)
       : trimmed.startsWith("~/")
-        ? path.join(process.env.HOME ?? "~", trimmed.slice(2))
+        ? path.join(getHomeDirectory() ?? "~", trimmed.slice(2))
         : trimmed;
 
   if (path.isAbsolute(withExpandedHome)) return withExpandedHome;
@@ -112,6 +130,8 @@ export function resolveSoundPath(
   if (rawCustomSoundPath.length > 0) {
     const resolvedCustomSoundPath = resolveCustomSoundPath(rawCustomSoundPath);
     if (resolvedCustomSoundPath && fs.existsSync(resolvedCustomSoundPath)) {
+      clearInvalidCustomSoundWarningPath(resolvedCustomSoundPath);
+      clearMissingSoundWarningPath(defaultSoundPath);
       return resolvedCustomSoundPath;
     }
 
@@ -123,8 +143,10 @@ export function resolveSoundPath(
 
   if (!fs.existsSync(defaultSoundPath)) {
     showMissingSoundFileWarning(defaultSoundPath);
+    return defaultSoundPath;
   }
 
+  clearMissingSoundWarningPath(defaultSoundPath);
   return defaultSoundPath;
 }
 

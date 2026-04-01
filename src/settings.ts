@@ -109,6 +109,10 @@ export const defaultStoredSettings: StoredSettings = {
 
 export type SettingsPersistTarget = "auto" | "workspace" | "global";
 
+export type PersistStoredSettingsResult = {
+  skippedConfigurationKeys: string[];
+};
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -156,11 +160,37 @@ function readConfigurationOverride<T>(
 ): T | undefined {
   const inspected = config.inspect<T>(key);
   if (!inspected) return undefined;
+
   if (inspected.workspaceFolderValue !== undefined)
     return inspected.workspaceFolderValue;
   if (inspected.workspaceValue !== undefined) return inspected.workspaceValue;
   if (inspected.globalValue !== undefined) return inspected.globalValue;
   return undefined;
+}
+
+function updateConfigurationValue<T>(
+  config: vscode.WorkspaceConfiguration,
+  key: string,
+  value: T,
+  target: vscode.ConfigurationTarget,
+  skippedConfigurationKeys: string[],
+): Promise<void> | undefined {
+  const inspect = config.inspect;
+  if (typeof inspect === "function" && inspect.call(config, key) === undefined) {
+    console.warn(
+      `[faah] Skipping update for unregistered configuration: ${configurationSection}.${key}`,
+    );
+    skippedConfigurationKeys.push(`${configurationSection}.${key}`);
+    return undefined;
+  }
+
+  return Promise.resolve(config.update(key, value, target)).catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[faah] Skipping configuration update for ${configurationSection}.${key}: ${message}`,
+    );
+    skippedConfigurationKeys.push(`${configurationSection}.${key}`);
+  });
 }
 
 function resolveConfigurationTarget(
@@ -413,70 +443,128 @@ export async function persistStoredSettings(
   context: vscode.ExtensionContext,
   settings: StoredSettings,
   target: SettingsPersistTarget = "auto",
-): Promise<void> {
+): Promise<PersistStoredSettingsResult> {
   const config = vscode.workspace.getConfiguration(configurationSection);
   const configurationTarget = resolveConfigurationTarget(target);
+  const skippedConfigurationKeys: string[] = [];
 
   await Promise.all([
-    config.update("enabled", settings.enabled, configurationTarget),
-    config.update(
+    updateConfigurationValue(
+      config,
+      "enabled",
+      settings.enabled,
+      configurationTarget,
+      skippedConfigurationKeys,
+    ),
+    updateConfigurationValue(
+      config,
       "monitorTerminal",
       settings.monitorTerminal,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
-    config.update(
+    updateConfigurationValue(
+      config,
       "monitorDiagnostics",
       settings.monitorDiagnostics,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
-    config.update(
+    updateConfigurationValue(
+      config,
       "diagnosticsSeverity",
       settings.diagnosticsSeverity,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
-    config.update("cooldownMs", settings.cooldownMs, configurationTarget),
-    config.update(
+    updateConfigurationValue(
+      config,
+      "cooldownMs",
+      settings.cooldownMs,
+      configurationTarget,
+      skippedConfigurationKeys,
+    ),
+    updateConfigurationValue(
+      config,
       "terminalCooldownMs",
       settings.terminalCooldownMs,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
-    config.update(
+    updateConfigurationValue(
+      config,
       "diagnosticsCooldownMs",
       settings.diagnosticsCooldownMs,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
-    config.update("patternMode", settings.patternMode, configurationTarget),
-    config.update("volumePercent", settings.volumePercent, configurationTarget),
-    config.update(
+    updateConfigurationValue(
+      config,
+      "patternMode",
+      settings.patternMode,
+      configurationTarget,
+      skippedConfigurationKeys,
+    ),
+    updateConfigurationValue(
+      config,
+      "volumePercent",
+      settings.volumePercent,
+      configurationTarget,
+      skippedConfigurationKeys,
+    ),
+    updateConfigurationValue(
+      config,
       "showVisualNotifications",
       settings.showVisualNotifications,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
-    config.update(
+    updateConfigurationValue(
+      config,
       "customSoundPath",
       settings.customSoundPath,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
-    config.update(
+    updateConfigurationValue(
+      config,
       "quietHoursEnabled",
       settings.quietHoursEnabled,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
-    config.update(
+    updateConfigurationValue(
+      config,
       "quietHoursStart",
       settings.quietHoursStart,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
-    config.update("quietHoursEnd", settings.quietHoursEnd, configurationTarget),
-    config.update("patterns", settings.patterns, configurationTarget),
-    config.update(
+    updateConfigurationValue(
+      config,
+      "quietHoursEnd",
+      settings.quietHoursEnd,
+      configurationTarget,
+      skippedConfigurationKeys,
+    ),
+    updateConfigurationValue(
+      config,
+      "patterns",
+      settings.patterns,
+      configurationTarget,
+      skippedConfigurationKeys,
+    ),
+    updateConfigurationValue(
+      config,
       "excludePatterns",
       settings.excludePatterns,
       configurationTarget,
+      skippedConfigurationKeys,
     ),
   ]);
 
   await context.globalState.update(settingsStorageKey, settings);
+  return { skippedConfigurationKeys };
 }
 
 export function createPresetSettings(

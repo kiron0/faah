@@ -199,4 +199,56 @@ describe("audio unit tests", () => {
     const beepScript = mocks.spawn.mock.calls[1][1].at(-1);
     expect(beepScript).toContain("[console]::Beep(");
   });
+
+  it("expands Windows home-relative custom sound paths with USERPROFILE", async () => {
+    const originalHome = process.env.HOME;
+    const originalUserProfile = process.env.USERPROFILE;
+    delete process.env.HOME;
+    process.env.USERPROFILE = "C:\\Users\\Alice";
+
+    try {
+      const { audio, mocks } = await loadAudio("win32", { fileExists: true });
+      let observedPath = "";
+      mocks.existsSync.mockImplementation((candidate: string) => {
+        observedPath = candidate;
+        return true;
+      });
+
+      const resolved = audio.resolveSoundPath(
+        { asAbsolutePath: vi.fn(() => "C:\\app\\media\\faah.wav") } as any,
+        { customSoundPath: "~/sounds/custom.wav" },
+      );
+
+      expect(resolved).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
+      expect(observedPath).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
+      }
+
+      if (originalUserProfile === undefined) {
+        delete process.env.USERPROFILE;
+      } else {
+        process.env.USERPROFILE = originalUserProfile;
+      }
+    }
+  });
+
+  it("re-arms the missing default sound warning after the file becomes available again", async () => {
+    const { audio, mocks } = await loadAudio("linux", { fileExists: false });
+    mocks.existsSync
+      .mockImplementationOnce(() => false)
+      .mockImplementationOnce(() => true)
+      .mockImplementationOnce(() => false);
+
+    const context = { asAbsolutePath: vi.fn(() => "/tmp/ext/media/faah.wav") } as any;
+
+    expect(audio.resolveSoundPath(context)).toBe("/tmp/ext/media/faah.wav");
+    expect(audio.resolveSoundPath(context)).toBe("/tmp/ext/media/faah.wav");
+    expect(audio.resolveSoundPath(context)).toBe("/tmp/ext/media/faah.wav");
+
+    expect(mocks.showWarningMessage).toHaveBeenCalledTimes(2);
+  });
 });

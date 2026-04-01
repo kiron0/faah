@@ -139,6 +139,26 @@ describe("execution monitor integration tests", () => {
     expect(playAlert).toHaveBeenCalledTimes(1);
   });
 
+  it("allows the same execution to alert again after the monitor state is reset", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution(["error happened\n"]) as any;
+    const settings = createSettings();
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+    executionMonitor.resetExecutionMonitorState();
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(playAlert).toHaveBeenCalledTimes(2);
+  });
+
   it("catches stream read errors without throwing", async () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});

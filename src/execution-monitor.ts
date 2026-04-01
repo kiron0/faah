@@ -9,8 +9,8 @@ export type TerminalExecutionLike = object & {
   read(): AsyncIterable<string>;
 };
 
-const tailByExecution = new WeakMap<TerminalExecutionLike, string>();
-const playedByExecution = new WeakSet<object>();
+let tailByExecution = new WeakMap<TerminalExecutionLike, string>();
+let playedByExecution = new WeakSet<object>();
 
 const MAX_TAIL_LENGTH = 500;
 const LINE_SPLIT_REGEX = /\r?\n/;
@@ -95,4 +95,9 @@ export async function monitorExecutionOutput(
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`Failed to read terminal shell execution stream: ${message}`);
   }
+}
+
+export function resetExecutionMonitorState(): void {
+  tailByExecution = new WeakMap<TerminalExecutionLike, string>();
+  playedByExecution = new WeakSet<object>();
 }

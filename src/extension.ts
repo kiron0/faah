@@ -14,6 +14,7 @@ import {
 } from "./diagnostics-monitor";
 import {
   monitorExecutionOutput,
+  resetExecutionMonitorState,
   tryPlayForExecution,
 } from "./execution-monitor";
 import {
@@ -21,12 +22,16 @@ import {
   isExecutionIdentity,
   isTerminalExecutionLike,
 } from "./terminal-shell-integration";
-import { registerSettingsUiCommand } from "./settings-webview";
+import {
+  registerSettingsUiCommand,
+  saveTargetStorageKey,
+} from "./settings-webview";
 import {
   isValidQuietHoursTime,
   loadStoredSettings,
   normalizeStoredSettings,
   persistStoredSettings,
+  type PersistStoredSettingsResult,
   type SettingsPersistTarget,
   type StoredSettings,
   toRuntimeSettings,
@@ -56,6 +61,13 @@ function formatTime(dateMs: number): string {
   });
 }
 
+function getVscodeExport<K extends keyof typeof vscode>(
+  key: K,
+): (typeof vscode)[K] | undefined {
+  if (!Object.prototype.hasOwnProperty.call(vscode, key)) return undefined;
+  return vscode[key];
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   let storedSettings = loadStoredSettings(context);
   let settings = toRuntimeSettings(storedSettings);
@@ -65,6 +77,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const { item: statusBarItem, update: updateStatusBar } =
     createStatusBarController();
   const terminalShellExecutionApi = getTerminalShellExecutionApi();
+  const languagesApi = getVscodeExport("languages");
+  const windowApi = getVscodeExport("window");
+  const workspaceApi = getVscodeExport("workspace");
   const terminalMonitoringSupported = terminalShellExecutionApi !== null;
 
   if (!terminalMonitoringSupported) {
@@ -83,6 +98,10 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!statusRefreshTimer) return;
     clearInterval(statusRefreshTimer);
     statusRefreshTimer = undefined;
+  };
+
+  const refreshSoundPath = (): void => {
+    soundPath = resolveSoundPath(context, storedSettings);
   };
 
   const syncStatusBar = (): void => {
@@ -122,21 +141,26 @@ export function activate(context: vscode.ExtensionContext): void {
   const applySettings = async (
     nextSettings: StoredSettings,
     persistTarget: SettingsPersistTarget = "auto",
-  ): Promise<void> => {
+  ): Promise<void | PersistStoredSettingsResult> => {
     storedSettings = normalizeStoredSettings(nextSettings);
     settings = toRuntimeSettings(storedSettings);
-    soundPath = resolveSoundPath(context, storedSettings);
-    await persistStoredSettings(context, storedSettings, persistTarget);
+    refreshSoundPath();
+    const persistResult = await persistStoredSettings(
+      context,
+      storedSettings,
+      persistTarget,
+    );
     if (!settings.enabled || !settings.monitorDiagnostics) {
       clearEditorTypingDebounce();
     }
     syncStatusBar();
+    return persistResult;
   };
 
   const reloadSettingsFromConfiguration = (): void => {
     storedSettings = loadStoredSettings(context);
     settings = toRuntimeSettings(storedSettings);
-    soundPath = resolveSoundPath(context, storedSettings);
+    refreshSoundPath();
     syncStatusBar();
   };
   syncStatusBar();
@@ -147,8 +171,19 @@ export function activate(context: vscode.ExtensionContext): void {
     await applySettings({
       ...storedSettings,
       ...patch,
-    });
+    }, getPreferredPersistTarget());
   };
+
+  function getPreferredPersistTarget(): SettingsPersistTarget {
+    const hasWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
+    const rememberedTarget =
+      typeof context.globalState?.get === "function"
+        ? context.globalState.get<SettingsPersistTarget>(saveTargetStorageKey)
+        : undefined;
+    return rememberedTarget === "workspace" && hasWorkspace
+      ? "workspace"
+      : "global";
+  }
 
   const showCompatibilityStatus = (): void => {
     const hostName = vscode.env.appName || "This editor";
@@ -508,8 +543,8 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
 
-  const diagnosticsDisposable = vscode.languages.onDidChangeDiagnostics(
-    (event) => {
+  const diagnosticsDisposable =
+    languagesApi?.onDidChangeDiagnostics?.((event) => {
       if (!settings.enabled || !settings.monitorDiagnostics) return;
       if (editorTypingDebounceTimer) return;
       onDiagnosticsChanged(
@@ -517,26 +552,24 @@ export function activate(context: vscode.ExtensionContext): void {
         () => settings,
         () => soundPath,
       );
-    },
-  );
+    });
 
-  const activeEditorDisposable = vscode.window.onDidChangeActiveTextEditor(
-    () => {
+  const activeEditorDisposable =
+    windowApi?.onDidChangeActiveTextEditor?.(() => {
       if (!settings.enabled || !settings.monitorDiagnostics) return;
       clearEditorTypingDebounce();
       scanActiveEditorDiagnostics(
         () => settings,
         () => soundPath,
       );
-    },
-  );
+    });
 
-  const textDocumentDisposable = vscode.workspace.onDidChangeTextDocument(
-    (event) => {
+  const textDocumentDisposable =
+    workspaceApi?.onDidChangeTextDocument?.((event) => {
       if (!settings.enabled || !settings.monitorDiagnostics) return;
       if (event.contentChanges.length === 0) return;
 
-      const activeEditor = vscode.window.activeTextEditor;
+      const activeEditor = windowApi?.activeTextEditor;
       if (!activeEditor) return;
       if (
         event.document.uri.toString() !== activeEditor.document.uri.toString()
@@ -544,15 +577,41 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
 
       scheduleDebouncedDiagnosticsScan();
-    },
-  );
+    });
 
-  const configChangeDisposable = vscode.workspace.onDidChangeConfiguration(
-    (event) => {
+  const configChangeDisposable =
+    workspaceApi?.onDidChangeConfiguration?.((event) => {
       if (!event.affectsConfiguration("faah")) return;
+      const diagnosticsStateAffects =
+        event.affectsConfiguration("faah.enabled") ||
+        event.affectsConfiguration("faah.monitorDiagnostics") ||
+        event.affectsConfiguration("faah.diagnosticsSeverity") ||
+        event.affectsConfiguration("faah.patterns") ||
+        event.affectsConfiguration("faah.excludePatterns");
+      const terminalStateAffects =
+        event.affectsConfiguration("faah.enabled") ||
+        event.affectsConfiguration("faah.monitorTerminal") ||
+        event.affectsConfiguration("faah.patterns") ||
+        event.affectsConfiguration("faah.excludePatterns");
       reloadSettingsFromConfiguration();
-    },
-  );
+      if (terminalStateAffects) {
+        resetExecutionMonitorState();
+      }
+      if (diagnosticsStateAffects) {
+        disposeDiagnosticsMonitorState();
+        if (settings.enabled && settings.monitorDiagnostics) {
+          scanActiveEditorDiagnostics(
+            () => settings,
+            () => soundPath,
+          );
+        }
+      }
+    });
+
+  const workspaceFoldersDisposable =
+    workspaceApi?.onDidChangeWorkspaceFolders?.(() => {
+      refreshSoundPath();
+    });
 
   scanActiveEditorDiagnostics(
     () => settings,
@@ -567,15 +626,31 @@ export function activate(context: vscode.ExtensionContext): void {
     clearSnoozeDisposable,
     quietHoursDisposable,
     quickActionsDisposable,
-    diagnosticsDisposable,
-    activeEditorDisposable,
-    textDocumentDisposable,
-    configChangeDisposable,
     { dispose: clearEditorTypingDebounce },
     { dispose: clearStatusRefreshTimer },
     { dispose: disposeDiagnosticsMonitorState },
     statusBarItem,
   );
+
+  if (diagnosticsDisposable) {
+    context.subscriptions.push(diagnosticsDisposable);
+  }
+
+  if (activeEditorDisposable) {
+    context.subscriptions.push(activeEditorDisposable);
+  }
+
+  if (textDocumentDisposable) {
+    context.subscriptions.push(textDocumentDisposable);
+  }
+
+  if (configChangeDisposable) {
+    context.subscriptions.push(configChangeDisposable);
+  }
+
+  if (workspaceFoldersDisposable) {
+    context.subscriptions.push(workspaceFoldersDisposable);
+  }
 
   if (startDisposable) {
     context.subscriptions.push(startDisposable);
@@ -587,38 +662,48 @@ export function activate(context: vscode.ExtensionContext): void {
 
   queueMicrotask(() => {
     void (async () => {
-      const currentVersion = String(
-        context.extension.packageJSON.version ?? "unknown",
-      );
-      const seenVersion = context.globalState.get<string>(onboardingStateKey);
-      if (seenVersion === currentVersion) return;
-
-      await context.globalState.update(onboardingStateKey, currentVersion);
-
-      const onboardingMessage = terminalMonitoringSupported
-        ? "Faah is ready. Diagnostics and terminal monitoring are available in this host."
-        : "Faah is ready. Diagnostics monitoring is available, but terminal monitoring is unavailable in this host.";
-      const selection = await vscode.window.showInformationMessage(
-        onboardingMessage,
-        "Open Settings",
-        "Play Test Sound",
-        "Show Compatibility",
-      );
-
-      if (selection === "Open Settings") {
-        await vscode.commands.executeCommand(commandIds.openSettingsUi);
-        return;
-      }
-
-      if (selection === "Play Test Sound") {
-        await vscode.commands.executeCommand(commandIds.playTestSound);
-        return;
-      }
-
-      if (selection === "Show Compatibility") {
-        await vscode.commands.executeCommand(
-          commandIds.showCompatibilityStatus,
+      try {
+        const currentVersion = String(
+          context.extension?.packageJSON?.version ?? "unknown",
         );
+        const seenVersion =
+          typeof context.globalState?.get === "function"
+            ? context.globalState.get<string>(onboardingStateKey)
+            : undefined;
+        if (seenVersion === currentVersion) return;
+
+        if (typeof context.globalState?.update === "function") {
+          await context.globalState.update(onboardingStateKey, currentVersion);
+        }
+
+        const onboardingMessage = terminalMonitoringSupported
+          ? "Faah is ready. Diagnostics and terminal monitoring are available in this host."
+          : "Faah is ready. Diagnostics monitoring is available, but terminal monitoring is unavailable in this host.";
+        const selection = await vscode.window.showInformationMessage(
+          onboardingMessage,
+          "Open Settings",
+          "Play Test Sound",
+          "Show Compatibility",
+        );
+
+        if (selection === "Open Settings") {
+          await vscode.commands.executeCommand(commandIds.openSettingsUi);
+          return;
+        }
+
+        if (selection === "Play Test Sound") {
+          await vscode.commands.executeCommand(commandIds.playTestSound);
+          return;
+        }
+
+        if (selection === "Show Compatibility") {
+          await vscode.commands.executeCommand(
+            commandIds.showCompatibilityStatus,
+          );
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[faah] Onboarding flow failed: ${message}`);
       }
     })();
   });

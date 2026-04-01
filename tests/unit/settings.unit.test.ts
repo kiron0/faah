@@ -111,7 +111,10 @@ describe("settings unit tests", () => {
     const settings = await loadSettingsModuleWithVscode({
       workspace: {
         workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
-        getConfiguration: vi.fn(() => ({ update: configUpdate })),
+        getConfiguration: vi.fn(() => ({
+          inspect: vi.fn(() => ({ key: "registered" })),
+          update: configUpdate,
+        })),
       },
       ConfigurationTarget: {
         Global: "global",
@@ -154,6 +157,80 @@ describe("settings unit tests", () => {
     expect(
       configUpdate.mock.calls.every((call) => call[2] === "workspace"),
     ).toBe(true);
+  });
+
+  it("skips unregistered configuration keys and still saves the fallback state", async () => {
+    const configUpdate = vi.fn().mockResolvedValue(undefined);
+    const globalStateUpdate = vi.fn().mockResolvedValue(undefined);
+    const configInspect = vi.fn((key: string) =>
+      key === "showVisualNotifications" ? undefined : { key },
+    );
+    const settings = await loadSettingsModuleWithVscode({
+      workspace: {
+        workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
+        getConfiguration: vi.fn(() => ({
+          inspect: configInspect,
+          update: configUpdate,
+        })),
+      },
+      ConfigurationTarget: {
+        Global: "global",
+        Workspace: "workspace",
+      },
+    });
+
+    const result = await settings.persistStoredSettings(
+      { globalState: { update: globalStateUpdate } } as any,
+      settings.defaultStoredSettings,
+    );
+
+    expect(configInspect).toHaveBeenCalled();
+    expect(configUpdate).toHaveBeenCalled();
+    expect(
+      configUpdate.mock.calls.every(
+        (call) => call[0] !== "showVisualNotifications",
+      ),
+    ).toBe(true);
+    expect(
+      configUpdate.mock.calls.some((call) => call[0] === "enabled"),
+    ).toBe(true);
+    expect(configUpdate.mock.calls.every((call) => call[2] === "global")).toBe(
+      true,
+    );
+    expect(result.skippedConfigurationKeys).toEqual([
+      "faah.showVisualNotifications",
+    ]);
+    expect(globalStateUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats rejected configuration writes as skipped keys and still saves the fallback state", async () => {
+    const configUpdate = vi.fn((key: string) =>
+      key === "showVisualNotifications"
+        ? Promise.reject(new Error("Unable to write to User Settings because faah.showVisualNotifications is not a registered configuration."))
+        : Promise.resolve(undefined),
+    );
+    const globalStateUpdate = vi.fn().mockResolvedValue(undefined);
+    const settings = await loadSettingsModuleWithVscode({
+      workspace: {
+        workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
+        getConfiguration: vi.fn(() => ({ update: configUpdate })),
+      },
+      ConfigurationTarget: {
+        Global: "global",
+        Workspace: "workspace",
+      },
+    });
+
+    const result = await settings.persistStoredSettings(
+      { globalState: { update: globalStateUpdate } } as any,
+      settings.defaultStoredSettings,
+    );
+
+    expect(configUpdate).toHaveBeenCalled();
+    expect(result.skippedConfigurationKeys).toContain(
+      "faah.showVisualNotifications",
+    );
+    expect(globalStateUpdate).toHaveBeenCalledTimes(1);
   });
 
   it("applies the quiet preset with visual alerts and quiet hours enabled", async () => {
