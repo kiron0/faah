@@ -14,4 +14,6 @@ bun.lock
 .gitignore
 .DS_Store
 *.vsix
-out/extension.js.map
+out/**/*.js.map
+node_modules/**/test/**
+node_modules/**/.github/**
