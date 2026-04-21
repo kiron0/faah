@@ -4,8 +4,11 @@ src/**
 test/**
 tests/**
 **/*.ts
+!out/**/*.js
 tsconfig.json
+vitest.config.ts
 .github/**
+.agents/**
 bun.lock
 .git/**
 .gitignore
