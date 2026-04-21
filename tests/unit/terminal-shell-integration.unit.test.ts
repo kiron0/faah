@@ -79,10 +79,16 @@ describe("terminal shell integration unit tests", () => {
     const integration = await loadTerminalShellIntegrationModule();
 
     expect(
-      integration.getEffectiveTerminalMonitoringCapability("outputOnly", "exitCode"),
+      integration.getEffectiveTerminalMonitoringCapability(
+        "outputOnly",
+        "exitCode",
+      ),
     ).toBe("none");
     expect(
-      integration.getEffectiveTerminalMonitoringCapability("exitCodeOnly", "output"),
+      integration.getEffectiveTerminalMonitoringCapability(
+        "exitCodeOnly",
+        "output",
+      ),
     ).toBe("none");
     expect(
       integration.getEffectiveTerminalMonitoringCapability("full", "output"),

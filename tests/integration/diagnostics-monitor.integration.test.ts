@@ -87,7 +87,10 @@ async function loadDiagnosticsMonitorHarness() {
       Warning: 1,
     },
   }));
-  vi.doMock("../../src/audio", () => ({ playAlert }));
+  vi.doMock("../../src/audio", () => ({
+    playAlert,
+    prewarmAudioBackend: vi.fn(),
+  }));
 
   const diagnosticsMonitor = await import("../../src/diagnostics-monitor");
 

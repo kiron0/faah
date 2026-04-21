@@ -41,10 +41,8 @@ function isDiagnosticExcluded(
 function serializeDiagnostic(diagnostic: vscode.Diagnostic): string {
   const code = normalizeDiagnosticCode(diagnostic.code);
   const source = diagnostic.source ?? "";
-  const range =
-    `${diagnostic.range.start.line}:${diagnostic.range.start.character}` +
-    `-${diagnostic.range.end.line}:${diagnostic.range.end.character}`;
-  return `${source}|${code}|${range}|${diagnostic.message}`;
+  const line = diagnostic.range.start.line;
+  return `${source}|${code}|${line}|${diagnostic.message}`;
 }
 
 function createMonitoredDiagnosticsFingerprint(
@@ -167,10 +165,14 @@ export function onDiagnosticsChanged(
   tryPlayForEditor(activeEditor, getSettings, getSoundPath);
 }
 
-export function disposeDiagnosticsMonitorState(): void {
+export function clearDiagnosticsRetryTimers(): void {
   for (const timer of retryTimerByUri.values()) {
     clearTimeout(timer);
   }
   retryTimerByUri.clear();
+}
+
+export function disposeDiagnosticsMonitorState(): void {
+  clearDiagnosticsRetryTimers();
   lastFingerprintByUri.clear();
 }

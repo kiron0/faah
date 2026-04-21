@@ -70,7 +70,8 @@ export const excludePatternPresetDefinitions = [
   {
     id: "lintSummaries",
     label: "Lint Summaries",
-    description: "Ignore summary banners that report counts without real failure lines.",
+    description:
+      "Ignore summary banners that report counts without real failure lines.",
     patterns: [
       "^\\s*\\d+\\s+warnings?(?:,\\s*\\d+\\s+errors?)?\\s*$",
       "^\\s*\\d+\\s+errors?,\\s*\\d+\\s+warnings?\\s*$",
@@ -80,7 +81,8 @@ export const excludePatternPresetDefinitions = [
   {
     id: "packageManagerAdvisories",
     label: "Package Manager Advisories",
-    description: "Ignore package-manager audit/advisory summaries unless command actually fails.",
+    description:
+      "Ignore package-manager audit/advisory summaries unless command actually fails.",
     patterns: [
       "^\\s*(?:npm|yarn|pnpm|bun)\\s+(?:audit|advisory)\\b.*$",
       "^\\s*found\\s+\\d+\\s+vulnerabilit(?:y|ies)\\b.*$",
@@ -249,7 +251,10 @@ function updateConfigurationValue<T>(
   skippedConfigurationKeys: string[],
 ): Promise<void> | undefined {
   const inspect = config.inspect;
-  if (typeof inspect === "function" && inspect.call(config, key) === undefined) {
+  if (
+    typeof inspect === "function" &&
+    inspect.call(config, key) === undefined
+  ) {
     console.warn(
       `[faah] Skipping update for unregistered configuration: ${configurationSection}.${key}`,
     );

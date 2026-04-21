@@ -115,6 +115,7 @@ describe("extension monitor reset regression", () => {
     vi.doMock("../../src/audio", () => ({
       playAlert: vi.fn(),
       resolveSoundPath: vi.fn(() => "media/faah.wav"),
+      prewarmAudioBackend: vi.fn(),
     }));
     vi.doMock("../../src/alert-gate", () => ({
       clearSnoozeAlerts: vi.fn(),
@@ -133,6 +134,7 @@ describe("extension monitor reset regression", () => {
       },
     }));
     vi.doMock("../../src/diagnostics-monitor", () => ({
+      clearDiagnosticsRetryTimers: vi.fn(),
       disposeDiagnosticsMonitorState,
       onDiagnosticsChanged: vi.fn(),
       scanActiveEditorDiagnostics,
@@ -176,7 +178,7 @@ describe("extension monitor reset regression", () => {
     });
 
     expect(resetExecutionMonitorState).toHaveBeenCalledTimes(1);
-    expect(disposeDiagnosticsMonitorState).toHaveBeenCalledTimes(1);
+    expect(disposeDiagnosticsMonitorState).not.toHaveBeenCalled();
     expect(scanActiveEditorDiagnostics).toHaveBeenCalledTimes(1);
     expect(statusUpdate).toHaveBeenCalled();
   });

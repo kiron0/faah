@@ -73,7 +73,6 @@ export function tryPlayForExecution(
   soundPath: string,
 ): void {
   if (!settings.monitorTerminal) return;
-  if (!shouldMonitorTerminalExitCode(settings)) return;
   if (getAlertSuppressionReason(settings) !== null) return;
   if (playedByExecution.has(execution)) return;
   if (!tryAcquirePlaybackWindow(settings.terminalCooldownMs, "terminal"))
@@ -116,7 +115,11 @@ export async function monitorExecutionOutput(
       settings.enabled &&
       settings.monitorTerminal &&
       shouldMonitorTerminalOutput(settings) &&
-      matchesAlertPatterns(finalTail, settings.patterns, settings.excludePatterns)
+      matchesAlertPatterns(
+        finalTail,
+        settings.patterns,
+        settings.excludePatterns,
+      )
     ) {
       tryPlayForExecution(execution, settings, getSoundPath());
     }

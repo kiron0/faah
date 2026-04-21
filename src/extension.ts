@@ -5,9 +5,10 @@ import {
   getSnoozeRemainingMs,
   snoozeAlertsForMs,
 } from "./alert-gate";
-import { playAlert, resolveSoundPath } from "./audio";
+import { playAlert, prewarmAudioBackend, resetPrewarmState, resolveSoundPath } from "./audio";
 import { commandIds } from "./commands";
 import {
+  clearDiagnosticsRetryTimers,
   disposeDiagnosticsMonitorState,
   onDiagnosticsChanged,
   scanActiveEditorDiagnostics,
@@ -18,17 +19,6 @@ import {
   tryPlayForExecution,
 } from "./execution-monitor";
 import {
-  getEffectiveTerminalMonitoringCapability,
-  getTerminalShellExecutionApi,
-  getTerminalMonitoringCapability,
-  isExecutionIdentity,
-  isTerminalExecutionLike,
-} from "./terminal-shell-integration";
-import {
-  registerSettingsUiCommand,
-  saveTargetStorageKey,
-} from "./settings-webview";
-import {
   isValidQuietHoursTime,
   loadStoredSettings,
   normalizeStoredSettings,
@@ -38,9 +28,20 @@ import {
   type StoredSettings,
   toRuntimeSettings,
 } from "./settings";
+import {
+  registerSettingsUiCommand,
+  saveTargetStorageKey,
+} from "./settings-webview";
 import { createStatusBarController } from "./status-bar";
+import {
+  getEffectiveTerminalMonitoringCapability,
+  getTerminalMonitoringCapability,
+  getTerminalShellExecutionApi,
+  isExecutionIdentity,
+  isTerminalExecutionLike,
+} from "./terminal-shell-integration";
 
-const editorDiagnosticsTypingDebounceMs = 700;
+const editorDiagnosticsTypingDebounceMs = 300;
 const statusRefreshIntervalMs = 15_000;
 const onboardingStateKey = "faah.onboarding.seenVersion";
 
@@ -118,7 +119,12 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   const refreshSoundPath = (): void => {
+    const previousSoundPath = soundPath;
     soundPath = resolveSoundPath(context, storedSettings);
+    if (soundPath !== previousSoundPath) {
+      resetPrewarmState();
+    }
+    prewarmAudioBackend(soundPath);
   };
 
   const syncStatusBar = (): void => {
@@ -181,14 +187,18 @@ export function activate(context: vscode.ExtensionContext): void {
     syncStatusBar();
   };
   syncStatusBar();
+  prewarmAudioBackend(soundPath);
 
   const patchSettings = async (
     patch: Partial<StoredSettings>,
   ): Promise<void> => {
-    await applySettings({
-      ...storedSettings,
-      ...patch,
-    }, getPreferredPersistTarget());
+    await applySettings(
+      {
+        ...storedSettings,
+        ...patch,
+      },
+      getPreferredPersistTarget(),
+    );
   };
 
   function getPreferredPersistTarget(): SettingsPersistTarget {
@@ -261,9 +271,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const showCompatibilityStatus = (): void => {
     const { level, message } = getCompatibilityStatusMessage();
     if (level === "info") {
-      void vscode.window.showInformationMessage(
-        message,
-      );
+      void vscode.window.showInformationMessage(message);
       return;
     }
     void vscode.window.showWarningMessage(message);
@@ -283,6 +291,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const endDisposable =
     terminalShellExecutionApi?.onDidEndTerminalShellExecution?.((event) => {
       if (!settings.enabled || !settings.monitorTerminal) return;
+      if (settings.terminalDetectionMode === "output") return;
       if (event.exitCode === undefined || event.exitCode === 0) return;
       if (!isExecutionIdentity(event.execution)) return;
       tryPlayForExecution(event.execution, settings, soundPath);
@@ -477,10 +486,10 @@ export function activate(context: vscode.ExtensionContext): void {
         ? effectiveTerminalMonitoringCapability === "none"
           ? "Current detection mode is unsupported in this host"
           : effectiveTerminalMonitoringCapability === "exitCodeOnly"
-          ? "Exit-code alerts only in this host"
-          : effectiveTerminalMonitoringCapability === "outputOnly"
-            ? "Output-stream alerts only in this host"
-          : "Watch shell output for errors"
+            ? "Exit-code alerts only in this host"
+            : effectiveTerminalMonitoringCapability === "outputOnly"
+              ? "Output-stream alerts only in this host"
+              : "Watch shell output for errors"
         : "Unavailable in this Cursor/VS Code version";
       const actions: QuickAction[] = [
         {
@@ -491,8 +500,7 @@ export function activate(context: vscode.ExtensionContext): void {
         {
           label: !terminalMonitoringSupported
             ? "Terminal Monitoring Unavailable"
-            : !effectiveTerminalMonitoringSupported &&
-                !settings.monitorTerminal
+            : !effectiveTerminalMonitoringSupported && !settings.monitorTerminal
               ? "Terminal Monitoring Unsupported for Current Mode"
               : settings.monitorTerminal
                 ? "Disable Terminal Monitoring"
@@ -651,8 +659,8 @@ export function activate(context: vscode.ExtensionContext): void {
     );
   }
 
-  const diagnosticsDisposable =
-    languagesApi?.onDidChangeDiagnostics?.((event) => {
+  const diagnosticsDisposable = languagesApi?.onDidChangeDiagnostics?.(
+    (event) => {
       if (!settings.enabled || !settings.monitorDiagnostics) return;
       if (editorTypingDebounceTimer) return;
       onDiagnosticsChanged(
@@ -660,20 +668,22 @@ export function activate(context: vscode.ExtensionContext): void {
         () => settings,
         () => soundPath,
       );
-    });
+    },
+  );
 
-  const activeEditorDisposable =
-    windowApi?.onDidChangeActiveTextEditor?.(() => {
+  const activeEditorDisposable = windowApi?.onDidChangeActiveTextEditor?.(
+    () => {
       if (!settings.enabled || !settings.monitorDiagnostics) return;
       clearEditorTypingDebounce();
       scanActiveEditorDiagnostics(
         () => settings,
         () => soundPath,
       );
-    });
+    },
+  );
 
-  const textDocumentDisposable =
-    workspaceApi?.onDidChangeTextDocument?.((event) => {
+  const textDocumentDisposable = workspaceApi?.onDidChangeTextDocument?.(
+    (event) => {
       if (!settings.enabled || !settings.monitorDiagnostics) return;
       if (event.contentChanges.length === 0) return;
 
@@ -685,10 +695,11 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
 
       scheduleDebouncedDiagnosticsScan();
-    });
+    },
+  );
 
-  const configChangeDisposable =
-    workspaceApi?.onDidChangeConfiguration?.((event) => {
+  const configChangeDisposable = workspaceApi?.onDidChangeConfiguration?.(
+    (event) => {
       if (!event.affectsConfiguration("faah")) return;
       const diagnosticsStateAffects =
         event.affectsConfiguration("faah.enabled") ||
@@ -711,7 +722,7 @@ export function activate(context: vscode.ExtensionContext): void {
         resetExecutionMonitorState();
       }
       if (diagnosticsStateAffects) {
-        disposeDiagnosticsMonitorState();
+        clearDiagnosticsRetryTimers();
         if (settings.enabled && settings.monitorDiagnostics) {
           scanActiveEditorDiagnostics(
             () => settings,
@@ -719,7 +730,8 @@ export function activate(context: vscode.ExtensionContext): void {
           );
         }
       }
-    });
+    },
+  );
 
   const workspaceFoldersDisposable =
     workspaceApi?.onDidChangeWorkspaceFolders?.(() => {

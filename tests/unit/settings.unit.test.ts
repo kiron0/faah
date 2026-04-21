@@ -241,9 +241,9 @@ describe("settings unit tests", () => {
         (call) => call[0] !== "showVisualNotifications",
       ),
     ).toBe(true);
-    expect(
-      configUpdate.mock.calls.some((call) => call[0] === "enabled"),
-    ).toBe(true);
+    expect(configUpdate.mock.calls.some((call) => call[0] === "enabled")).toBe(
+      true,
+    );
     expect(configUpdate.mock.calls.every((call) => call[2] === "global")).toBe(
       true,
     );
@@ -256,7 +256,11 @@ describe("settings unit tests", () => {
   it("treats rejected configuration writes as skipped keys and still saves the fallback state", async () => {
     const configUpdate = vi.fn((key: string) =>
       key === "showVisualNotifications"
-        ? Promise.reject(new Error("Unable to write to User Settings because faah.showVisualNotifications is not a registered configuration."))
+        ? Promise.reject(
+            new Error(
+              "Unable to write to User Settings because faah.showVisualNotifications is not a registered configuration.",
+            ),
+          )
         : Promise.resolve(undefined),
     );
     const globalStateUpdate = vi.fn().mockResolvedValue(undefined);

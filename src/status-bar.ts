@@ -99,7 +99,7 @@ export function createStatusBarController(): {
         : settings.monitorTerminal &&
             effectiveTerminalMonitoringCapability !== "full"
           ? " $(info)"
-        : "";
+          : "";
     item.text = isSnoozed
       ? "$(bell-slash) Faah Snoozed"
       : `$(bell) Faah ${sourceSummary}${unsupportedTerminalBadge}`;
@@ -117,12 +117,12 @@ export function createStatusBarController(): {
           ? [
               "Terminal monitoring: partial host support. Exit-code alerts work, but output-stream monitoring is unavailable.",
             ]
-        : settings.monitorTerminal &&
-            effectiveTerminalMonitoringCapability === "outputOnly"
-          ? [
-              "Terminal monitoring: partial host support. Output-stream alerts work, but exit-code monitoring is unavailable.",
-            ]
-        : []),
+          : settings.monitorTerminal &&
+              effectiveTerminalMonitoringCapability === "outputOnly"
+            ? [
+                "Terminal monitoring: partial host support. Output-stream alerts work, but exit-code monitoring is unavailable.",
+              ]
+            : []),
       `Terminal cooldown: ${settings.terminalCooldownMs}ms`,
       `Diagnostics cooldown: ${settings.diagnosticsCooldownMs}ms`,
       `Quiet hours: ${describeQuietHours(settings)}`,

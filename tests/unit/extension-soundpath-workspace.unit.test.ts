@@ -29,9 +29,7 @@ describe("extension sound path regression", () => {
   it("refreshes the resolved custom sound path when workspace folders change", async () => {
     vi.resetModules();
 
-    let workspaceFoldersHandler:
-      | (() => void)
-      | undefined;
+    let workspaceFoldersHandler: (() => void) | undefined;
     const playAlert = vi.fn();
     const resolvedPaths = [
       "/workspace-a/sounds/custom.wav",
@@ -103,6 +101,8 @@ describe("extension sound path regression", () => {
     vi.doMock("../../src/audio", () => ({
       playAlert,
       resolveSoundPath,
+      prewarmAudioBackend: vi.fn(),
+      resetPrewarmState: vi.fn(),
     }));
     vi.doMock("../../src/alert-gate", () => ({
       clearSnoozeAlerts: vi.fn(),
@@ -121,6 +121,7 @@ describe("extension sound path regression", () => {
       },
     }));
     vi.doMock("../../src/diagnostics-monitor", () => ({
+      clearDiagnosticsRetryTimers: vi.fn(),
       disposeDiagnosticsMonitorState: vi.fn(),
       onDiagnosticsChanged: vi.fn(),
       scanActiveEditorDiagnostics: vi.fn(),

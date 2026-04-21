@@ -33,7 +33,10 @@ describe("alert dispatch unit tests", () => {
     const playAlert = vi.fn();
     const showWarningMessage = vi.fn();
 
-    vi.doMock("../../src/audio", () => ({ playAlert }));
+    vi.doMock("../../src/audio", () => ({
+      playAlert,
+      prewarmAudioBackend: vi.fn(),
+    }));
     vi.doMock("vscode", () => ({ window: { showWarningMessage } }));
 
     const dispatch = await import("../../src/alert-dispatch");
@@ -49,7 +52,10 @@ describe("alert dispatch unit tests", () => {
     const playAlert = vi.fn();
     const showWarningMessage = vi.fn();
 
-    vi.doMock("../../src/audio", () => ({ playAlert }));
+    vi.doMock("../../src/audio", () => ({
+      playAlert,
+      prewarmAudioBackend: vi.fn(),
+    }));
     vi.doMock("vscode", () => ({ window: { showWarningMessage } }));
 
     const dispatch = await import("../../src/alert-dispatch");

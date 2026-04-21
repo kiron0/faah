@@ -220,6 +220,7 @@ async function loadExtensionHarness(
   vi.doMock("../../src/audio", () => ({
     playAlert,
     resolveSoundPath,
+    prewarmAudioBackend: vi.fn(),
   }));
   vi.doMock("../../src/execution-monitor", () => ({
     monitorExecutionOutput,
@@ -443,6 +444,7 @@ describe("extension smoke tests", () => {
     vi.doMock("../../src/audio", () => ({
       playAlert: vi.fn(),
       resolveSoundPath: vi.fn(() => "media/faah.wav"),
+      prewarmAudioBackend: vi.fn(),
     }));
     vi.doMock("../../src/execution-monitor", () => ({
       monitorExecutionOutput: vi.fn(),
@@ -544,6 +546,7 @@ describe("extension smoke tests", () => {
     vi.doMock("../../src/audio", () => ({
       playAlert: vi.fn(),
       resolveSoundPath: vi.fn(() => "media/faah.wav"),
+      prewarmAudioBackend: vi.fn(),
     }));
     vi.doMock("../../src/execution-monitor", () => ({
       monitorExecutionOutput: vi.fn(),
@@ -654,6 +657,7 @@ describe("extension smoke tests", () => {
     vi.doMock("../../src/audio", () => ({
       playAlert: vi.fn(),
       resolveSoundPath: vi.fn(() => "media/faah.wav"),
+      prewarmAudioBackend: vi.fn(),
     }));
     vi.doMock("../../src/execution-monitor", () => ({
       monitorExecutionOutput: vi.fn(),
@@ -760,6 +764,7 @@ describe("extension smoke tests", () => {
     vi.doMock("../../src/audio", () => ({
       playAlert: vi.fn(),
       resolveSoundPath: vi.fn(() => "media/faah.wav"),
+      prewarmAudioBackend: vi.fn(),
     }));
     vi.doMock("../../src/execution-monitor", () => ({
       monitorExecutionOutput: vi.fn(),

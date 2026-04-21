@@ -14,7 +14,9 @@ type LoadAudioOptions = {
   playError?: Error;
   workspaceFolders?: Array<{ uri: { fsPath: string } }>;
   activeEditorUri?: unknown;
-  getWorkspaceFolder?: (uri: unknown) => { uri: { fsPath: string } } | undefined;
+  getWorkspaceFolder?: (
+    uri: unknown,
+  ) => { uri: { fsPath: string } } | undefined;
 };
 
 type ModuleMocks = {
@@ -216,95 +218,101 @@ describe("audio unit tests", () => {
     expect(beepScript).toContain("[console]::Beep(");
   });
 
-  it("falls back to console beep if Windows system player fails at 100 volume", async () => {
+  it("falls back to console beep if Windows SoundPlayer exits with non-zero code at 100 volume", async () => {
     const { audio, mocks } = await loadAudio("win32", {
-      playError: new Error("player failed"),
+      spawnCloseCodes: [1, 0],
     });
 
     audio.playAlert(createSettings(100), "media/faah.wav");
+    await flushMicrotasks();
 
-    expect(mocks.play).toHaveBeenCalledTimes(1);
-    expect(mocks.spawn).toHaveBeenCalledTimes(1);
-    const beepScript = mocks.spawn.mock.calls[0][1].at(-1);
+    expect(mocks.play).not.toHaveBeenCalled();
+    expect(mocks.spawn).toHaveBeenCalledTimes(2);
+    const [command, args] = mocks.spawn.mock.calls[0];
+    expect(command).toBe("powershell");
+    expect(args).toEqual(expect.arrayContaining(["-Command"]));
+    const soundPlayerScript = args[args.length - 1];
+    expect(soundPlayerScript).toContain("System.Media.SoundPlayer");
+    const beepScript = mocks.spawn.mock.calls[1][1].at(-1);
     expect(beepScript).toContain("[console]::Beep(");
   });
 
   it("expands Windows home-relative custom sound paths with USERPROFILE", async () => {
-      const originalHome = process.env.HOME;
-      const originalUserProfile = process.env.USERPROFILE;
-      delete process.env.HOME;
-      process.env.USERPROFILE = "C:\\Users\\Alice";
+    const originalHome = process.env.HOME;
+    const originalUserProfile = process.env.USERPROFILE;
+    delete process.env.HOME;
+    process.env.USERPROFILE = "C:\\Users\\Alice";
 
-      try {
-        const { audio, mocks } = await loadAudio("win32", { fileExists: true });
-        let observedPath = "";
-        mocks.existsSync.mockImplementation((candidate: string) => {
-          observedPath = candidate;
-          return true;
-        });
+    try {
+      const { audio, mocks } = await loadAudio("win32", { fileExists: true });
+      let observedPath = "";
+      mocks.existsSync.mockImplementation((candidate: string) => {
+        observedPath = candidate;
+        return true;
+      });
 
-        const resolved = audio.resolveSoundPath(
-          { asAbsolutePath: vi.fn(() => "C:\\app\\media\\faah.wav") } as any,
-          { customSoundPath: "~/sounds/custom.wav" },
-        );
+      const resolved = audio.resolveSoundPath(
+        { asAbsolutePath: vi.fn(() => "C:\\app\\media\\faah.wav") } as any,
+        { customSoundPath: "~/sounds/custom.wav" },
+      );
 
-        expect(resolved).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
-        expect(observedPath).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
-      } finally {
-        if (originalHome === undefined) {
-          delete process.env.HOME;
-        } else {
-          process.env.HOME = originalHome;
-        }
-
-        if (originalUserProfile === undefined) {
-          delete process.env.USERPROFILE;
-        } else {
-          process.env.USERPROFILE = originalUserProfile;
-        }
+      expect(resolved).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
+      expect(observedPath).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
       }
-    },
-  );
+
+      if (originalUserProfile === undefined) {
+        delete process.env.USERPROFILE;
+      } else {
+        process.env.USERPROFILE = originalUserProfile;
+      }
+    }
+  });
 
   it("expands Windows backslash home-relative custom sound paths with USERPROFILE", async () => {
-      const originalHome = process.env.HOME;
-      const originalUserProfile = process.env.USERPROFILE;
-      delete process.env.HOME;
-      process.env.USERPROFILE = "C:\\Users\\Alice";
+    const originalHome = process.env.HOME;
+    const originalUserProfile = process.env.USERPROFILE;
+    delete process.env.HOME;
+    process.env.USERPROFILE = "C:\\Users\\Alice";
 
-      try {
-        const { audio, mocks } = await loadAudio("win32", { fileExists: true });
-        let observedPath = "";
-        mocks.existsSync.mockImplementation((candidate: string) => {
-          observedPath = candidate;
-          return true;
-        });
+    try {
+      const { audio, mocks } = await loadAudio("win32", { fileExists: true });
+      let observedPath = "";
+      mocks.existsSync.mockImplementation((candidate: string) => {
+        observedPath = candidate;
+        return true;
+      });
 
-        const resolved = audio.resolveSoundPath(
-          { asAbsolutePath: vi.fn(() => "C:\\app\\media\\faah.wav") } as any,
-          { customSoundPath: "~\\sounds\\custom.wav" },
-        );
+      const resolved = audio.resolveSoundPath(
+        { asAbsolutePath: vi.fn(() => "C:\\app\\media\\faah.wav") } as any,
+        { customSoundPath: "~\\sounds\\custom.wav" },
+      );
 
-        expect(resolved).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
-        expect(observedPath).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
-      } finally {
-        if (originalHome === undefined) {
-          delete process.env.HOME;
-        } else {
-          process.env.HOME = originalHome;
-        }
-
-        if (originalUserProfile === undefined) {
-          delete process.env.USERPROFILE;
-        } else {
-          process.env.USERPROFILE = originalUserProfile;
-        }
+      expect(resolved).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
+      expect(observedPath).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
       }
-    },
-  );
+
+      if (originalUserProfile === undefined) {
+        delete process.env.USERPROFILE;
+      } else {
+        process.env.USERPROFILE = originalUserProfile;
+      }
+    }
+  });
 
   it("resolves relative custom sounds against matching folders in multi-root workspaces", async () => {
-    const activeEditorUri = { toString: () => "file:///workspace-b/src/index.ts" };
+    const activeEditorUri = {
+      toString: () => "file:///workspace-b/src/index.ts",
+    };
     const { audio, mocks } = await loadAudio("linux", {
       workspaceFolders: [
         { uri: { fsPath: "/workspace-a" } },
@@ -335,7 +343,9 @@ describe("audio unit tests", () => {
       .mockImplementationOnce(() => true)
       .mockImplementationOnce(() => false);
 
-    const context = { asAbsolutePath: vi.fn(() => "/tmp/ext/media/faah.wav") } as any;
+    const context = {
+      asAbsolutePath: vi.fn(() => "/tmp/ext/media/faah.wav"),
+    } as any;
 
     expect(audio.resolveSoundPath(context)).toBe("/tmp/ext/media/faah.wav");
     expect(audio.resolveSoundPath(context)).toBe("/tmp/ext/media/faah.wav");

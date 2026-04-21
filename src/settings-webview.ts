@@ -77,7 +77,7 @@ function renderSettingsWebview(
         ? "Terminal monitoring has partial host support here. Non-zero exit-code alerts work, but output-stream monitoring is unavailable."
         : terminalMonitoringCapability === "outputOnly"
           ? "Terminal monitoring has partial host support here. Output-stream alerts work, but non-zero exit-code monitoring is unavailable."
-        : "Terminal monitoring is unavailable in this host. Diagnostics alerts still work normally.";
+          : "Terminal monitoring is unavailable in this host. Diagnostics alerts still work normally.";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -570,7 +570,7 @@ function renderSettingsWebview(
                   ? "This host only supports terminal exit-code alerts. Output-stream monitoring is unavailable here."
                   : terminalMonitoringCapability === "outputOnly"
                     ? "This host only supports terminal output-stream alerts. Non-zero exit-code monitoring is unavailable here."
-                  : "Play alerts for terminal command output."
+                    : "Play alerts for terminal command output."
                 : "Unavailable in this host. Your saved preference is preserved, but runtime monitoring is disabled here."
             }</div>
           </div>
@@ -1436,12 +1436,12 @@ export function registerSettingsUiCommand(
   function renderPanelHtml(): string {
     return renderSettingsWebview(
       panel!.webview,
-        context,
-        getStoredSettings(),
-        hasWorkspaceOpen(),
-        terminalMonitoringCapability,
-        getInitialSaveTarget(),
-      );
+      context,
+      getStoredSettings(),
+      hasWorkspaceOpen(),
+      terminalMonitoringCapability,
+      getInitialSaveTarget(),
+    );
   }
 
   const commandDisposable = vscode.commands.registerCommand(
@@ -1654,15 +1654,13 @@ export function registerSettingsUiCommand(
   );
 
   const workspaceFoldersDisposable =
-    vscode.workspace.onDidChangeWorkspaceFolders?.(
-    () => {
+    vscode.workspace.onDidChangeWorkspaceFolders?.(() => {
       if (!panel) return;
       panel.webview.postMessage({
         type: "workspaceFoldersUpdated",
         hasWorkspace: hasWorkspaceOpen(),
       });
-    },
-  );
+    });
 
   return vscode.Disposable.from(
     commandDisposable,

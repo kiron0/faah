@@ -48,7 +48,10 @@ async function loadExecutionMonitor() {
   const playAlert = vi.fn();
 
   vi.doMock("vscode", () => ({ window: { showWarningMessage: vi.fn() } }));
-  vi.doMock("../../src/audio", () => ({ playAlert }));
+  vi.doMock("../../src/audio", () => ({
+    playAlert,
+    prewarmAudioBackend: vi.fn(),
+  }));
   const executionMonitor = await import("../../src/execution-monitor");
 
   return { executionMonitor, playAlert };
@@ -170,14 +173,14 @@ describe("execution monitor integration tests", () => {
     expect(playAlert).toHaveBeenCalledTimes(1);
   });
 
-  it("skips exit-code-triggered alerts when terminal detection mode is output only", async () => {
+  it("plays exit-code-triggered alerts regardless of detection mode (callers filter mode)", async () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
     const execution = createExecution([]) as any;
     const settings = createSettings({ terminalDetectionMode: "output" });
 
     executionMonitor.tryPlayForExecution(execution, settings, "media/faah.wav");
 
-    expect(playAlert).not.toHaveBeenCalled();
+    expect(playAlert).toHaveBeenCalledTimes(1);
   });
 
   it("allows the same execution to alert again after the monitor state is reset", async () => {

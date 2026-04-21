@@ -29,6 +29,13 @@ let hasWarnedWindowsFallback = false;
 let hasWarnedLinuxMissingPlayer = false;
 let lastMissingSoundWarningPath: string | null = null;
 let lastInvalidCustomSoundWarningPath: string | null = null;
+let hasAttemptedWindowsPrewarm = false;
+let hasCompletedWindowsPrewarm = false;
+
+export function resetPrewarmState(): void {
+  hasAttemptedWindowsPrewarm = false;
+  hasCompletedWindowsPrewarm = false;
+}
 
 type PlayMethodOptionsLoose = Record<string, Array<string | number>> & {
   timeout?: number;
@@ -229,6 +236,54 @@ function playWindowsBeepFallback(volumePercent: number): void {
   });
 }
 
+export function prewarmAudioBackend(soundPath: string): void {
+  if (!isWindows) return;
+  if (hasCompletedWindowsPrewarm || hasAttemptedWindowsPrewarm) return;
+  if (!fs.existsSync(soundPath)) return;
+  hasAttemptedWindowsPrewarm = true;
+
+  const escapedSoundPath = escapePowerShellSingleQuoted(soundPath);
+  // Full exercise: load assembly, open file, play briefly, stop — warms codec cache
+  const warmupScript = [
+    "$ErrorActionPreference = 'SilentlyContinue'",
+    "Add-Type -AssemblyName PresentationCore",
+    "$mp = New-Object System.Windows.Media.MediaPlayer",
+    "$mp.Volume = 0",
+    `$mp.Open([Uri]::new('${escapedSoundPath}'))`,
+    "$deadline = (Get-Date).AddMilliseconds(600)",
+    "while (-not $mp.NaturalDuration.HasTimeSpan -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 10 }",
+    "$mp.Play()",
+    "Start-Sleep -Milliseconds 80",
+    "$mp.Stop()",
+    "$mp.Close()",
+  ].join("; ");
+
+  const warmupProcess = spawn(
+    "powershell",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-STA",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      warmupScript,
+    ],
+    {
+      stdio: "ignore",
+      windowsHide: true,
+    },
+  );
+
+  warmupProcess.on("close", () => {
+    hasCompletedWindowsPrewarm = true;
+  });
+
+  warmupProcess.on("error", () => {
+    hasCompletedWindowsPrewarm = false;
+  });
+}
+
 function playOnWindowsWithSoundPlayer(
   soundPath: string,
   settings: RuntimeSettings,
@@ -283,11 +338,11 @@ function playOnWindows(soundPath: string, settings: RuntimeSettings): void {
     `$player.Volume = ${volumeRatio.toFixed(2)}`,
     "$player.Open([Uri]::new($path))",
     "$player.Play()",
-    "$durationDeadline = (Get-Date).AddMilliseconds(800)",
-    "while (-not $player.NaturalDuration.HasTimeSpan -and (Get-Date) -lt $durationDeadline) { Start-Sleep -Milliseconds 15 }",
+    "$durationDeadline = (Get-Date).AddMilliseconds(100)",
+    "while (-not $player.NaturalDuration.HasTimeSpan -and (Get-Date) -lt $durationDeadline) { Start-Sleep -Milliseconds 10 }",
     "$waitMs = 2000",
     "if ($player.NaturalDuration.HasTimeSpan) {",
-    "  $waitMs = [Math]::Min(15000, [Math]::Max(300, [int]([Math]::Ceiling($player.NaturalDuration.TimeSpan.TotalMilliseconds) + 120)))",
+    "  $waitMs = [Math]::Min(15000, [Math]::Max(200, [int]([Math]::Ceiling($player.NaturalDuration.TimeSpan.TotalMilliseconds) + 80)))",
     "}",
     "Start-Sleep -Milliseconds $waitMs",
     "$player.Stop()",

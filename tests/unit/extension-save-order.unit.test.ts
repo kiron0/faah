@@ -105,6 +105,7 @@ describe("extension save order regression", () => {
     vi.doMock("../../src/audio", () => ({
       playAlert: vi.fn(),
       resolveSoundPath: vi.fn(() => "media/faah.wav"),
+      prewarmAudioBackend: vi.fn(),
     }));
     vi.doMock("../../src/alert-gate", () => ({
       clearSnoozeAlerts: vi.fn(),
@@ -240,6 +241,7 @@ describe("extension save order regression", () => {
     vi.doMock("../../src/audio", () => ({
       playAlert: vi.fn(),
       resolveSoundPath: vi.fn(() => "media/faah.wav"),
+      prewarmAudioBackend: vi.fn(),
     }));
     vi.doMock("../../src/alert-gate", () => ({
       clearSnoozeAlerts: vi.fn(),
