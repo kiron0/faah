@@ -62,7 +62,6 @@ export function createStatusBarController(): {
     100,
   );
   item.name = "Faah";
-  item.command = commandIds.showQuickActions;
   item.show();
 
   const update = (

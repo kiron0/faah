@@ -84,6 +84,12 @@ export function activate(context: vscode.ExtensionContext): void {
   const windowApi = getVscodeExport("window");
   const workspaceApi = getVscodeExport("workspace");
   const terminalMonitoringSupported = terminalMonitoringCapability !== "none";
+  let settingsUiAvailable = false;
+  const showSettingsUiUnavailableWarning = (): void => {
+    void vscode.window.showWarningMessage(
+      "Faah settings UI is unavailable in this session.",
+    );
+  };
 
   if (terminalMonitoringCapability === "none") {
     console.info(
@@ -196,35 +202,71 @@ export function activate(context: vscode.ExtensionContext): void {
       : "global";
   }
 
-  const showCompatibilityStatus = (): void => {
+  const getEffectiveTerminalMonitoringState = () =>
+    getEffectiveTerminalMonitoringCapability(
+      terminalMonitoringCapability,
+      settings.terminalDetectionMode,
+    );
+
+  const showCurrentModeUnsupportedWarning = (): void => {
+    void vscode.window.showWarningMessage(
+      "Faah terminal monitoring is unavailable for current Terminal Detection Mode in this host. Change Terminal Detection Mode to a supported signal.",
+    );
+  };
+
+  const getCompatibilityStatusMessage = (): {
+    level: "info" | "warning";
+    message: string;
+  } => {
     const hostName = vscode.env.appName || "This editor";
     const hostVersion = vscode.version;
     const baseMessage = `${hostName} reports VS Code API ${hostVersion}.`;
+    const effectiveTerminalMonitoringCapability =
+      getEffectiveTerminalMonitoringState();
 
-    if (terminalMonitoringCapability === "full") {
+    if (effectiveTerminalMonitoringCapability === "full") {
+      return {
+        level: "info",
+        message: `${baseMessage} Faah diagnostics and terminal monitoring are available.`,
+      };
+    }
+
+    if (effectiveTerminalMonitoringCapability === "outputOnly") {
+      return {
+        level: "warning",
+        message: `${baseMessage} Faah diagnostics monitoring is available. Terminal monitoring has partial host support: output-stream alerts work, but non-zero exit-code monitoring is unavailable.`,
+      };
+    }
+
+    if (effectiveTerminalMonitoringCapability === "exitCodeOnly") {
+      return {
+        level: "warning",
+        message: `${baseMessage} Faah diagnostics monitoring is available. Terminal monitoring has partial host support: non-zero exit-code alerts work, but output-stream monitoring is unavailable.`,
+      };
+    }
+
+    if (terminalMonitoringCapability !== "none") {
+      return {
+        level: "warning",
+        message: `${baseMessage} Faah diagnostics monitoring is available, but terminal monitoring is unavailable for current Terminal Detection Mode in this host. Change Terminal Detection Mode to a supported signal.`,
+      };
+    }
+
+    return {
+      level: "warning",
+      message: `${baseMessage} Faah diagnostics monitoring is available, but terminal monitoring is not supported in this host.`,
+    };
+  };
+
+  const showCompatibilityStatus = (): void => {
+    const { level, message } = getCompatibilityStatusMessage();
+    if (level === "info") {
       void vscode.window.showInformationMessage(
-        `${baseMessage} Faah diagnostics and terminal monitoring are available.`,
+        message,
       );
       return;
     }
-
-    if (terminalMonitoringCapability === "outputOnly") {
-      void vscode.window.showWarningMessage(
-        `${baseMessage} Faah diagnostics monitoring is available. Terminal monitoring has partial host support: output-stream alerts work, but non-zero exit-code monitoring is unavailable.`,
-      );
-      return;
-    }
-
-    if (terminalMonitoringCapability === "exitCodeOnly") {
-      void vscode.window.showWarningMessage(
-        `${baseMessage} Faah diagnostics monitoring is available. Terminal monitoring has partial host support: non-zero exit-code alerts work, but output-stream monitoring is unavailable.`,
-      );
-      return;
-    }
-
-    void vscode.window.showWarningMessage(
-      `${baseMessage} Faah diagnostics monitoring is available, but terminal monitoring is not supported in this host.`,
-    );
+    void vscode.window.showWarningMessage(message);
   };
 
   const startDisposable =
@@ -245,19 +287,6 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!isExecutionIdentity(event.execution)) return;
       tryPlayForExecution(event.execution, settings, soundPath);
     });
-
-  const settingsUiDisposable = registerSettingsUiCommand(
-    context,
-    () => storedSettings,
-    applySettings,
-    (testSettings) =>
-      playAlert(
-        toRuntimeSettings(testSettings),
-        resolveSoundPath(context, testSettings),
-      ),
-    terminalMonitoringCapability,
-    commandIds.openSettingsUi,
-  );
 
   const playTestSoundDisposable = vscode.commands.registerCommand(
     commandIds.playTestSound,
@@ -442,6 +471,8 @@ export function activate(context: vscode.ExtensionContext): void {
           terminalMonitoringCapability,
           settings.terminalDetectionMode,
         );
+      const effectiveTerminalMonitoringSupported =
+        effectiveTerminalMonitoringCapability !== "none";
       const terminalMonitoringDescription = terminalMonitoringSupported
         ? effectiveTerminalMonitoringCapability === "none"
           ? "Current detection mode is unsupported in this host"
@@ -458,11 +489,14 @@ export function activate(context: vscode.ExtensionContext): void {
           action: "toggleEnabled",
         },
         {
-          label: terminalMonitoringSupported
-            ? settings.monitorTerminal
-              ? "Disable Terminal Monitoring"
-              : "Enable Terminal Monitoring"
-            : "Terminal Monitoring Unavailable",
+          label: !terminalMonitoringSupported
+            ? "Terminal Monitoring Unavailable"
+            : !effectiveTerminalMonitoringSupported &&
+                !settings.monitorTerminal
+              ? "Terminal Monitoring Unsupported for Current Mode"
+              : settings.monitorTerminal
+                ? "Disable Terminal Monitoring"
+                : "Enable Terminal Monitoring",
           description: terminalMonitoringDescription,
           action: "toggleTerminal",
         },
@@ -536,6 +570,13 @@ export function activate(context: vscode.ExtensionContext): void {
             );
             break;
           }
+          if (
+            !effectiveTerminalMonitoringSupported &&
+            !storedSettings.monitorTerminal
+          ) {
+            showCurrentModeUnsupportedWarning();
+            break;
+          }
           await patchSettings({
             monitorTerminal: !storedSettings.monitorTerminal,
           });
@@ -563,6 +604,12 @@ export function activate(context: vscode.ExtensionContext): void {
           await vscode.commands.executeCommand(commandIds.setQuietHours);
           break;
         case "openSettings":
+          if (!settingsUiAvailable) {
+            void vscode.window.showWarningMessage(
+              "Faah settings UI is unavailable in this session.",
+            );
+            break;
+          }
           await vscode.commands.executeCommand(commandIds.openSettingsUi);
           break;
         case "showCompatibility":
@@ -578,6 +625,31 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     },
   );
+  statusBarItem.command = commandIds.showQuickActions;
+
+  let settingsUiDisposable: vscode.Disposable = { dispose: () => undefined };
+  try {
+    settingsUiDisposable = registerSettingsUiCommand(
+      context,
+      () => storedSettings,
+      applySettings,
+      (testSettings) =>
+        playAlert(
+          toRuntimeSettings(testSettings),
+          resolveSoundPath(context, testSettings),
+        ),
+      terminalMonitoringCapability,
+      commandIds.openSettingsUi,
+    );
+    settingsUiAvailable = true;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[faah] Settings UI registration failed: ${message}`);
+    settingsUiDisposable = vscode.commands.registerCommand(
+      commandIds.openSettingsUi,
+      showSettingsUiUnavailableWarning,
+    );
+  }
 
   const diagnosticsDisposable =
     languagesApi?.onDidChangeDiagnostics?.((event) => {
@@ -717,13 +789,18 @@ export function activate(context: vscode.ExtensionContext): void {
           await context.globalState.update(onboardingStateKey, currentVersion);
         }
 
-        const onboardingMessage = terminalMonitoringSupported
-          ? terminalMonitoringCapability === "exitCodeOnly"
+        const effectiveTerminalMonitoringCapability =
+          getEffectiveTerminalMonitoringState();
+        const onboardingMessage =
+          effectiveTerminalMonitoringCapability === "exitCodeOnly"
             ? "Faah is ready. Diagnostics alerts work, and terminal monitoring has partial host support: non-zero exit-code alerts work but output-stream monitoring is unavailable."
-            : terminalMonitoringCapability === "outputOnly"
+            : effectiveTerminalMonitoringCapability === "outputOnly"
               ? "Faah is ready. Diagnostics alerts work, and terminal monitoring has partial host support: output-stream alerts work but non-zero exit-code monitoring is unavailable."
-            : "Faah is ready. Diagnostics and terminal monitoring are available in this host."
-          : "Faah is ready. Diagnostics monitoring is available, but terminal monitoring is unavailable in this host.";
+              : effectiveTerminalMonitoringCapability === "full"
+                ? "Faah is ready. Diagnostics and terminal monitoring are available in this host."
+                : terminalMonitoringSupported
+                  ? "Faah is ready. Diagnostics monitoring is available, but terminal monitoring is unavailable for current Terminal Detection Mode in this host. Change Terminal Detection Mode to a supported signal."
+                  : "Faah is ready. Diagnostics monitoring is available, but terminal monitoring is unavailable in this host.";
         const selection = await vscode.window.showInformationMessage(
           onboardingMessage,
           "Open Settings",

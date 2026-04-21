@@ -3,7 +3,7 @@
   "displayName": "Faah - Error Alerts",
   "description": "Never miss errors in your editor. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.",
   "icon": "images/icon.png",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {

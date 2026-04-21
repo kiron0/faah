@@ -7,6 +7,14 @@ type Harness = {
   context: {
     subscriptions: Array<{ dispose: () => void }>;
   };
+  statusBarItem: {
+    text: string;
+    tooltip: string;
+    name: string;
+    command: string;
+    show: ReturnType<typeof vi.fn>;
+    dispose: () => void;
+  };
   getStartHandler: () => ((event: { execution: unknown }) => void) | undefined;
   getEndHandler: () =>
     | ((event: { execution: unknown; exitCode?: number }) => void)
@@ -258,6 +266,7 @@ async function loadExtensionHarness(
   return {
     extension,
     context,
+    statusBarItem,
     getStartHandler: () => startHandler,
     getEndHandler: () => endHandler,
     getActiveEditorHandler: () => activeEditorHandler,
@@ -394,5 +403,405 @@ describe("extension smoke tests", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("keeps quick actions on the status bar even if settings UI registration fails", async () => {
+    vi.resetModules();
+
+    const statusBarItem = {
+      text: "",
+      tooltip: "",
+      name: "",
+      command: "",
+      show: vi.fn(),
+      dispose: vi.fn(),
+    };
+
+    vi.doMock("vscode", () => ({
+      window: {
+        createStatusBarItem: vi.fn(() => statusBarItem),
+      },
+      commands: {
+        registerCommand: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+      workspace: {
+        workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
+        getConfiguration: vi.fn(() => ({
+          inspect: vi.fn(() => undefined),
+          update: vi.fn(),
+        })),
+      },
+      env: {
+        appName: "VS Code",
+      },
+      version: "1.0.0",
+      StatusBarAlignment: {
+        Right: 2,
+      },
+    }));
+
+    vi.doMock("../../src/audio", () => ({
+      playAlert: vi.fn(),
+      resolveSoundPath: vi.fn(() => "media/faah.wav"),
+    }));
+    vi.doMock("../../src/execution-monitor", () => ({
+      monitorExecutionOutput: vi.fn(),
+      tryPlayForExecution: vi.fn(),
+      resetExecutionMonitorState: vi.fn(),
+    }));
+    vi.doMock("../../src/diagnostics-monitor", () => ({
+      onDiagnosticsChanged: vi.fn(),
+      scanActiveEditorDiagnostics: vi.fn(),
+      disposeDiagnosticsMonitorState: vi.fn(),
+    }));
+    vi.doMock("../../src/settings-webview", () => ({
+      registerSettingsUiCommand: vi.fn(() => {
+        throw new Error("settings ui failed");
+      }),
+      saveTargetStorageKey: "faah.settings.saveTarget.v1",
+    }));
+    vi.doMock("../../src/settings", () => ({
+      loadStoredSettings: vi.fn(() => createStoredSettings(true)),
+      normalizeStoredSettings: vi.fn((next: StoredSettings) => next),
+      persistStoredSettings: vi.fn(async () => undefined),
+      toRuntimeSettings: vi.fn((stored: StoredSettings) =>
+        createRuntimeSettings(stored),
+      ),
+    }));
+
+    const extension = await import("../../src/extension");
+    extension.activate({
+      subscriptions: [],
+      extension: { packageJSON: { version: "0.1.8" } },
+      globalState: {
+        get: vi.fn(() => undefined),
+        update: vi.fn(async () => undefined),
+      },
+    } as any);
+
+    expect(statusBarItem.command).toBe("faah.showQuickActions");
+    expect(statusBarItem.show).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports current detection mode incompatibility in compatibility status", async () => {
+    vi.resetModules();
+
+    const commandHandlers = new Map<string, () => void>();
+    const showWarningMessage = vi.fn(async () => undefined);
+    const storedSettings = {
+      ...createStoredSettings(true),
+      terminalDetectionMode: "exitCode" as const,
+    };
+    const statusBarItem = {
+      text: "",
+      tooltip: "",
+      name: "",
+      command: "",
+      show: vi.fn(),
+      dispose: vi.fn(),
+    };
+
+    vi.doMock("vscode", () => ({
+      window: {
+        activeTextEditor: undefined,
+        onDidStartTerminalShellExecution: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
+        createStatusBarItem: vi.fn(() => statusBarItem),
+        showQuickPick: vi.fn(async () => undefined),
+        showInformationMessage: vi.fn(async () => undefined),
+        showWarningMessage,
+        showInputBox: vi.fn(async () => undefined),
+      },
+      workspace: {
+        workspaceFolders: [],
+        getConfiguration: vi.fn(() => ({
+          inspect: vi.fn(() => undefined),
+          update: vi.fn(async () => undefined),
+        })),
+        onDidChangeTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
+        getWorkspaceFolder: vi.fn(() => undefined),
+      },
+      languages: {
+        onDidChangeDiagnostics: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+      commands: {
+        registerCommand: vi.fn((id: string, cb: () => void) => {
+          commandHandlers.set(id, cb);
+          return { dispose: vi.fn() };
+        }),
+        executeCommand: vi.fn(async () => undefined),
+      },
+      env: {
+        appName: "VS Code",
+      },
+      version: "1.0.0",
+      StatusBarAlignment: {
+        Right: 2,
+      },
+    }));
+
+    vi.doMock("../../src/audio", () => ({
+      playAlert: vi.fn(),
+      resolveSoundPath: vi.fn(() => "media/faah.wav"),
+    }));
+    vi.doMock("../../src/execution-monitor", () => ({
+      monitorExecutionOutput: vi.fn(),
+      tryPlayForExecution: vi.fn(),
+      resetExecutionMonitorState: vi.fn(),
+    }));
+    vi.doMock("../../src/diagnostics-monitor", () => ({
+      onDiagnosticsChanged: vi.fn(),
+      scanActiveEditorDiagnostics: vi.fn(),
+      disposeDiagnosticsMonitorState: vi.fn(),
+    }));
+    vi.doMock("../../src/settings-webview", () => ({
+      registerSettingsUiCommand: vi.fn(() => ({ dispose: vi.fn() })),
+      saveTargetStorageKey: "faah.settings.saveTarget.v1",
+    }));
+    vi.doMock("../../src/settings", () => ({
+      loadStoredSettings: vi.fn(() => storedSettings),
+      normalizeStoredSettings: vi.fn((next: StoredSettings) => next),
+      persistStoredSettings: vi.fn(async () => undefined),
+      toRuntimeSettings: vi.fn((stored: StoredSettings) =>
+        createRuntimeSettings(stored),
+      ),
+    }));
+
+    const extension = await import("../../src/extension");
+    extension.activate({
+      subscriptions: [],
+      extension: { packageJSON: { version: "0.2.0" } },
+      globalState: {
+        get: vi.fn(() => "0.2.0"),
+        update: vi.fn(async () => undefined),
+      },
+    } as any);
+
+    commandHandlers.get("faah.showCompatibilityStatus")?.();
+
+    expect(showWarningMessage).toHaveBeenCalledWith(
+      expect.stringContaining("current Terminal Detection Mode"),
+    );
+  });
+
+  it("blocks enabling terminal monitoring when current detection mode is unsupported", async () => {
+    vi.resetModules();
+
+    const commandHandlers = new Map<string, () => Promise<void> | void>();
+    const showWarningMessage = vi.fn(async () => undefined);
+    const persistStoredSettings = vi.fn(async () => undefined);
+    const shownQuickPickItems: Array<{ label: string; action: string }> = [];
+    const storedSettings = {
+      ...createStoredSettings(true),
+      monitorTerminal: false,
+      terminalDetectionMode: "exitCode" as const,
+    };
+    const statusBarItem = {
+      text: "",
+      tooltip: "",
+      name: "",
+      command: "",
+      show: vi.fn(),
+      dispose: vi.fn(),
+    };
+
+    vi.doMock("vscode", () => ({
+      window: {
+        activeTextEditor: undefined,
+        onDidStartTerminalShellExecution: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
+        createStatusBarItem: vi.fn(() => statusBarItem),
+        showQuickPick: vi.fn(
+          async (items: Array<{ label: string; action: string }>) => {
+            shownQuickPickItems.push(...items);
+            return items.find((item) => item.action === "toggleTerminal");
+          },
+        ),
+        showInformationMessage: vi.fn(async () => undefined),
+        showWarningMessage,
+        showInputBox: vi.fn(async () => undefined),
+      },
+      workspace: {
+        workspaceFolders: [],
+        getConfiguration: vi.fn(() => ({
+          inspect: vi.fn(() => undefined),
+          update: vi.fn(async () => undefined),
+        })),
+        onDidChangeTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
+        getWorkspaceFolder: vi.fn(() => undefined),
+      },
+      languages: {
+        onDidChangeDiagnostics: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+      commands: {
+        registerCommand: vi.fn((id: string, cb: () => Promise<void> | void) => {
+          commandHandlers.set(id, cb);
+          return { dispose: vi.fn() };
+        }),
+        executeCommand: vi.fn(async () => undefined),
+      },
+      env: {
+        appName: "VS Code",
+      },
+      version: "1.0.0",
+      StatusBarAlignment: {
+        Right: 2,
+      },
+    }));
+
+    vi.doMock("../../src/audio", () => ({
+      playAlert: vi.fn(),
+      resolveSoundPath: vi.fn(() => "media/faah.wav"),
+    }));
+    vi.doMock("../../src/execution-monitor", () => ({
+      monitorExecutionOutput: vi.fn(),
+      tryPlayForExecution: vi.fn(),
+      resetExecutionMonitorState: vi.fn(),
+    }));
+    vi.doMock("../../src/diagnostics-monitor", () => ({
+      onDiagnosticsChanged: vi.fn(),
+      scanActiveEditorDiagnostics: vi.fn(),
+      disposeDiagnosticsMonitorState: vi.fn(),
+    }));
+    vi.doMock("../../src/settings-webview", () => ({
+      registerSettingsUiCommand: vi.fn(() => ({ dispose: vi.fn() })),
+      saveTargetStorageKey: "faah.settings.saveTarget.v1",
+    }));
+    vi.doMock("../../src/settings", () => ({
+      loadStoredSettings: vi.fn(() => storedSettings),
+      normalizeStoredSettings: vi.fn((next: StoredSettings) => next),
+      persistStoredSettings,
+      toRuntimeSettings: vi.fn((stored: StoredSettings) =>
+        createRuntimeSettings(stored),
+      ),
+    }));
+
+    const extension = await import("../../src/extension");
+    extension.activate({
+      subscriptions: [],
+      extension: { packageJSON: { version: "0.2.0" } },
+      globalState: {
+        get: vi.fn(() => "0.2.0"),
+        update: vi.fn(async () => undefined),
+      },
+    } as any);
+
+    await commandHandlers.get("faah.showQuickActions")?.();
+
+    expect(shownQuickPickItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "Terminal Monitoring Unsupported for Current Mode",
+        }),
+      ]),
+    );
+    expect(showWarningMessage).toHaveBeenCalledWith(
+      expect.stringContaining("current Terminal Detection Mode"),
+    );
+    expect(persistStoredSettings).not.toHaveBeenCalled();
+  });
+
+  it("onboarding reflects unsupported current detection mode", async () => {
+    vi.resetModules();
+
+    const showInformationMessage = vi.fn(async () => undefined);
+    const storedSettings = {
+      ...createStoredSettings(true),
+      terminalDetectionMode: "exitCode" as const,
+    };
+    const statusBarItem = {
+      text: "",
+      tooltip: "",
+      name: "",
+      command: "",
+      show: vi.fn(),
+      dispose: vi.fn(),
+    };
+
+    vi.doMock("vscode", () => ({
+      window: {
+        activeTextEditor: undefined,
+        onDidStartTerminalShellExecution: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
+        createStatusBarItem: vi.fn(() => statusBarItem),
+        showQuickPick: vi.fn(async () => undefined),
+        showInformationMessage,
+        showWarningMessage: vi.fn(async () => undefined),
+        showInputBox: vi.fn(async () => undefined),
+      },
+      workspace: {
+        workspaceFolders: [],
+        getConfiguration: vi.fn(() => ({
+          inspect: vi.fn(() => undefined),
+          update: vi.fn(async () => undefined),
+        })),
+        onDidChangeTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
+        getWorkspaceFolder: vi.fn(() => undefined),
+      },
+      languages: {
+        onDidChangeDiagnostics: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+      commands: {
+        registerCommand: vi.fn(() => ({ dispose: vi.fn() })),
+        executeCommand: vi.fn(async () => undefined),
+      },
+      env: {
+        appName: "VS Code",
+      },
+      version: "1.0.0",
+      StatusBarAlignment: {
+        Right: 2,
+      },
+    }));
+
+    vi.doMock("../../src/audio", () => ({
+      playAlert: vi.fn(),
+      resolveSoundPath: vi.fn(() => "media/faah.wav"),
+    }));
+    vi.doMock("../../src/execution-monitor", () => ({
+      monitorExecutionOutput: vi.fn(),
+      tryPlayForExecution: vi.fn(),
+      resetExecutionMonitorState: vi.fn(),
+    }));
+    vi.doMock("../../src/diagnostics-monitor", () => ({
+      onDiagnosticsChanged: vi.fn(),
+      scanActiveEditorDiagnostics: vi.fn(),
+      disposeDiagnosticsMonitorState: vi.fn(),
+    }));
+    vi.doMock("../../src/settings-webview", () => ({
+      registerSettingsUiCommand: vi.fn(() => ({ dispose: vi.fn() })),
+      saveTargetStorageKey: "faah.settings.saveTarget.v1",
+    }));
+    vi.doMock("../../src/settings", () => ({
+      loadStoredSettings: vi.fn(() => storedSettings),
+      normalizeStoredSettings: vi.fn((next: StoredSettings) => next),
+      persistStoredSettings: vi.fn(async () => undefined),
+      toRuntimeSettings: vi.fn((stored: StoredSettings) =>
+        createRuntimeSettings(stored),
+      ),
+    }));
+
+    const extension = await import("../../src/extension");
+    extension.activate({
+      subscriptions: [],
+      extension: { packageJSON: { version: "0.2.0" } },
+      globalState: {
+        get: vi.fn(() => undefined),
+        update: vi.fn(async () => undefined),
+      },
+    } as any);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(showInformationMessage).toHaveBeenCalledWith(
+      expect.stringContaining("current Terminal Detection Mode"),
+      "Open Settings",
+      "Play Test Sound",
+      "Show Compatibility",
+    );
   });
 });
