@@ -5,9 +5,10 @@ test/**
 tests/**
 **/*.ts
 tsconfig.json
+.github/**
+bun.lock
 .git/**
 .gitignore
 .DS_Store
 *.vsix
-out/extenstion.js
-out/extenstion.js.map
+out/extension.js.map

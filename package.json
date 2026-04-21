@@ -3,7 +3,7 @@
   "displayName": "Faah - Error Alerts",
   "description": "Never miss errors in your editor. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.",
   "icon": "images/icon.png",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {
@@ -110,6 +110,17 @@
           "default": "error",
           "scope": "resource",
           "description": "Diagnostic severities that can trigger Faah."
+        },
+        "faah.terminalDetectionMode": {
+          "type": "string",
+          "enum": [
+            "either",
+            "output",
+            "exitCode"
+          ],
+          "default": "either",
+          "scope": "resource",
+          "description": "Choose whether terminal alerts should trigger from output pattern matches, non-zero exit codes, or either signal."
         },
         "faah.cooldownMs": {
           "type": "number",
@@ -230,12 +241,28 @@
             "^\\\\[[^\\\\]]+\\\\s[0-9a-f]{7,40}\\\\]\\\\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\\\([^)]+\\\\))?!?:\\\\s.+$",
             "^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\\\([^)]+\\\\))?!?:\\\\s.+$"
           ]
+        },
+        "faah.excludePresetIds": {
+          "type": "array",
+          "scope": "resource",
+          "description": "Built-in false-positive suppression preset groups to apply.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "conventionalCommits",
+              "testSnapshots",
+              "lintSummaries",
+              "packageManagerAdvisories"
+            ]
+          },
+          "default": []
         }
       }
     }
   },
   "scripts": {
     "compile": "tsc -p ./",
+    "build": "npm run compile",
     "lint": "tsc --noEmit -p ./",
     "watch": "tsc -w -p ./",
     "test": "vitest run",
@@ -251,12 +278,12 @@
     "play-sound": "^1.1.6"
   },
   "devDependencies": {
-    "@types/node": "^25.3.2",
+    "@types/node": "^25.6.0",
     "@types/play-sound": "^1.1.2",
     "@types/vscode": "1.105.0",
-    "@vscode/vsce": "^3.7.1",
-    "prettier": "^3.8.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "@vscode/vsce": "^3.9.1",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
   }
 }

@@ -12,6 +12,9 @@ type LoadAudioOptions = {
   fileExists?: boolean;
   spawnCloseCodes?: Array<number | null>;
   playError?: Error;
+  workspaceFolders?: Array<{ uri: { fsPath: string } }>;
+  activeEditorUri?: unknown;
+  getWorkspaceFolder?: (uri: unknown) => { uri: { fsPath: string } } | undefined;
 };
 
 type ModuleMocks = {
@@ -28,6 +31,7 @@ function createSettings(volumePercent: number): RuntimeSettings {
     monitorTerminal: true,
     monitorDiagnostics: true,
     diagnosticsSeverity: "error",
+    terminalDetectionMode: "either",
     cooldownMs: 1500,
     terminalCooldownMs: 1500,
     diagnosticsCooldownMs: 1500,
@@ -37,6 +41,7 @@ function createSettings(volumePercent: number): RuntimeSettings {
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
     quietHoursEnd: "07:00",
+    excludePresetIds: ["conventionalCommits"],
     patterns: [/error/i],
     excludePatterns: [],
   };
@@ -85,8 +90,16 @@ async function loadAudio(
 
   vi.doMock("fs", () => ({ existsSync }));
   vi.doMock("vscode", () => ({
-    window: { showWarningMessage },
-    workspace: { workspaceFolders: undefined },
+    window: {
+      showWarningMessage,
+      activeTextEditor: options.activeEditorUri
+        ? { document: { uri: options.activeEditorUri } }
+        : undefined,
+    },
+    workspace: {
+      workspaceFolders: options.workspaceFolders,
+      getWorkspaceFolder: options.getWorkspaceFolder,
+    },
   }));
   vi.doMock("child_process", () => ({ spawn }));
   vi.doMock("play-sound", () => ({ default: playSoundFactory }));
@@ -203,6 +216,19 @@ describe("audio unit tests", () => {
     expect(beepScript).toContain("[console]::Beep(");
   });
 
+  it("falls back to console beep if Windows system player fails at 100 volume", async () => {
+    const { audio, mocks } = await loadAudio("win32", {
+      playError: new Error("player failed"),
+    });
+
+    audio.playAlert(createSettings(100), "media/faah.wav");
+
+    expect(mocks.play).toHaveBeenCalledTimes(1);
+    expect(mocks.spawn).toHaveBeenCalledTimes(1);
+    const beepScript = mocks.spawn.mock.calls[0][1].at(-1);
+    expect(beepScript).toContain("[console]::Beep(");
+  });
+
   it("expands Windows home-relative custom sound paths with USERPROFILE", async () => {
       const originalHome = process.env.HOME;
       const originalUserProfile = process.env.USERPROFILE;
@@ -239,6 +265,68 @@ describe("audio unit tests", () => {
       }
     },
   );
+
+  it("expands Windows backslash home-relative custom sound paths with USERPROFILE", async () => {
+      const originalHome = process.env.HOME;
+      const originalUserProfile = process.env.USERPROFILE;
+      delete process.env.HOME;
+      process.env.USERPROFILE = "C:\\Users\\Alice";
+
+      try {
+        const { audio, mocks } = await loadAudio("win32", { fileExists: true });
+        let observedPath = "";
+        mocks.existsSync.mockImplementation((candidate: string) => {
+          observedPath = candidate;
+          return true;
+        });
+
+        const resolved = audio.resolveSoundPath(
+          { asAbsolutePath: vi.fn(() => "C:\\app\\media\\faah.wav") } as any,
+          { customSoundPath: "~\\sounds\\custom.wav" },
+        );
+
+        expect(resolved).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
+        expect(observedPath).toBe("C:\\Users\\Alice\\sounds\\custom.wav");
+      } finally {
+        if (originalHome === undefined) {
+          delete process.env.HOME;
+        } else {
+          process.env.HOME = originalHome;
+        }
+
+        if (originalUserProfile === undefined) {
+          delete process.env.USERPROFILE;
+        } else {
+          process.env.USERPROFILE = originalUserProfile;
+        }
+      }
+    },
+  );
+
+  it("resolves relative custom sounds against matching folders in multi-root workspaces", async () => {
+    const activeEditorUri = { toString: () => "file:///workspace-b/src/index.ts" };
+    const { audio, mocks } = await loadAudio("linux", {
+      workspaceFolders: [
+        { uri: { fsPath: "/workspace-a" } },
+        { uri: { fsPath: "/workspace-b" } },
+      ],
+      activeEditorUri,
+      getWorkspaceFolder: () => ({ uri: { fsPath: "/workspace-b" } }),
+    });
+
+    mocks.existsSync.mockImplementation(
+      (candidate: string) =>
+        candidate.includes("workspace-b") && candidate.includes("custom.wav"),
+    );
+
+    const resolved = audio.resolveSoundPath(
+      { asAbsolutePath: vi.fn(() => "/tmp/ext/media/faah.wav") } as any,
+      { customSoundPath: "./sounds/custom.wav" },
+    );
+
+    expect(resolved).toContain("workspace-b");
+    expect(resolved).toContain("custom.wav");
+  });
 
   it("re-arms the missing default sound warning after the file becomes available again", async () => {
     const { audio, mocks } = await loadAudio("linux", { fileExists: false });

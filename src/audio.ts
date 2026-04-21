@@ -42,6 +42,28 @@ function getHomeDirectory(): string | undefined {
   return process.env.HOME ?? process.env.USERPROFILE;
 }
 
+function getWorkspaceFolderCandidates(): string[] {
+  const candidates: string[] = [];
+  const activeEditorUri = vscode.window.activeTextEditor?.document.uri;
+  const activeWorkspaceFolder =
+    activeEditorUri && typeof vscode.workspace.getWorkspaceFolder === "function"
+      ? vscode.workspace.getWorkspaceFolder(activeEditorUri)?.uri.fsPath
+      : undefined;
+
+  if (activeWorkspaceFolder) {
+    candidates.push(activeWorkspaceFolder);
+  }
+
+  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    const folderPath = folder.uri.fsPath;
+    if (!candidates.includes(folderPath)) {
+      candidates.push(folderPath);
+    }
+  }
+
+  return candidates;
+}
+
 function showMissingSoundFileWarning(soundPath: string): void {
   if (lastMissingSoundWarningPath === soundPath) return;
   lastMissingSoundWarningPath = soundPath;
@@ -110,13 +132,23 @@ function resolveCustomSoundPath(input: string): string {
   const withExpandedHome =
     trimmed === "~"
       ? (getHomeDirectory() ?? trimmed)
-      : trimmed.startsWith("~/")
+      : trimmed.startsWith("~/") || (isWindows && trimmed.startsWith("~\\"))
         ? pathApi.join(getHomeDirectory() ?? "~", trimmed.slice(2))
         : trimmed;
 
   if (pathApi.isAbsolute(withExpandedHome)) return withExpandedHome;
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (workspaceRoot) return pathApi.resolve(workspaceRoot, withExpandedHome);
+
+  const workspaceFolders = getWorkspaceFolderCandidates();
+  if (workspaceFolders.length > 0) {
+    const resolvedCandidates = workspaceFolders.map((workspaceFolder) =>
+      pathApi.resolve(workspaceFolder, withExpandedHome),
+    );
+    const existingCandidate = resolvedCandidates.find((candidate) =>
+      fs.existsSync(candidate),
+    );
+    return existingCandidate ?? resolvedCandidates[0];
+  }
+
   return pathApi.resolve(withExpandedHome);
 }
 
@@ -156,6 +188,12 @@ function playWithoutVolume(soundPath: string): void {
     if (!err) return;
     const errText = err.message ?? String(err);
     warnLinuxPlayerMissingOnce(errText);
+    if (isWindows) {
+      warnWindowsFallbackOnce(
+        `Failed to play sound with system audio player. Falling back to console beep. Error: ${errText}`,
+      );
+      playWindowsBeepFallback(100);
+    }
     console.warn(`Failed to play sound: ${errText}`);
   });
 }
@@ -290,7 +328,13 @@ function playCustomFileWithVolume(
   soundPath: string,
   settings: RuntimeSettings,
 ): void {
+  if (settings.volumePercent <= 0) return;
+
   if (isWindows) {
+    if (settings.volumePercent === 100) {
+      playWithoutVolume(soundPath);
+      return;
+    }
     playOnWindows(soundPath, settings);
     return;
   }

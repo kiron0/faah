@@ -18,7 +18,9 @@ import {
   tryPlayForExecution,
 } from "./execution-monitor";
 import {
+  getEffectiveTerminalMonitoringCapability,
   getTerminalShellExecutionApi,
+  getTerminalMonitoringCapability,
   isExecutionIdentity,
   isTerminalExecutionLike,
 } from "./terminal-shell-integration";
@@ -76,15 +78,24 @@ export function activate(context: vscode.ExtensionContext): void {
   let statusRefreshTimer: ReturnType<typeof setInterval> | undefined;
   const { item: statusBarItem, update: updateStatusBar } =
     createStatusBarController();
+  const terminalMonitoringCapability = getTerminalMonitoringCapability();
   const terminalShellExecutionApi = getTerminalShellExecutionApi();
   const languagesApi = getVscodeExport("languages");
   const windowApi = getVscodeExport("window");
   const workspaceApi = getVscodeExport("workspace");
-  const terminalMonitoringSupported = terminalShellExecutionApi !== null;
+  const terminalMonitoringSupported = terminalMonitoringCapability !== "none";
 
-  if (!terminalMonitoringSupported) {
+  if (terminalMonitoringCapability === "none") {
     console.info(
       "[faah] Terminal shell execution APIs are unavailable in this host. Terminal monitoring is disabled for this session.",
+    );
+  } else if (terminalMonitoringCapability === "outputOnly") {
+    console.info(
+      "[faah] Terminal shell execution APIs expose output-stream monitoring only in this host. Exit-code terminal alerts are unavailable for this session.",
+    );
+  } else if (terminalMonitoringCapability === "exitCodeOnly") {
+    console.info(
+      "[faah] Terminal shell execution APIs expose exit-code monitoring only in this host. Output-stream terminal alerts are unavailable for this session.",
     );
   }
 
@@ -108,14 +119,14 @@ export function activate(context: vscode.ExtensionContext): void {
     const snoozeRemainingMs = getSnoozeRemainingMs();
     updateStatusBar(settings, {
       snoozeRemainingMs,
-      terminalMonitoringSupported,
+      terminalMonitoringCapability,
     });
 
     if (snoozeRemainingMs > 0 && !statusRefreshTimer) {
       statusRefreshTimer = setInterval(() => {
         updateStatusBar(settings, {
           snoozeRemainingMs: getSnoozeRemainingMs(),
-          terminalMonitoringSupported,
+          terminalMonitoringCapability,
         });
       }, statusRefreshIntervalMs);
       return;
@@ -140,7 +151,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const applySettings = async (
     nextSettings: StoredSettings,
-    persistTarget: SettingsPersistTarget = "auto",
+    persistTarget: SettingsPersistTarget = "global",
   ): Promise<void | PersistStoredSettingsResult> => {
     storedSettings = normalizeStoredSettings(nextSettings);
     settings = toRuntimeSettings(storedSettings);
@@ -190,9 +201,23 @@ export function activate(context: vscode.ExtensionContext): void {
     const hostVersion = vscode.version;
     const baseMessage = `${hostName} reports VS Code API ${hostVersion}.`;
 
-    if (terminalMonitoringSupported) {
+    if (terminalMonitoringCapability === "full") {
       void vscode.window.showInformationMessage(
         `${baseMessage} Faah diagnostics and terminal monitoring are available.`,
+      );
+      return;
+    }
+
+    if (terminalMonitoringCapability === "outputOnly") {
+      void vscode.window.showWarningMessage(
+        `${baseMessage} Faah diagnostics monitoring is available. Terminal monitoring has partial host support: output-stream alerts work, but non-zero exit-code monitoring is unavailable.`,
+      );
+      return;
+    }
+
+    if (terminalMonitoringCapability === "exitCodeOnly") {
+      void vscode.window.showWarningMessage(
+        `${baseMessage} Faah diagnostics monitoring is available. Terminal monitoring has partial host support: non-zero exit-code alerts work, but output-stream monitoring is unavailable.`,
       );
       return;
     }
@@ -230,7 +255,7 @@ export function activate(context: vscode.ExtensionContext): void {
         toRuntimeSettings(testSettings),
         resolveSoundPath(context, testSettings),
       ),
-    terminalMonitoringSupported,
+    terminalMonitoringCapability,
     commandIds.openSettingsUi,
   );
 
@@ -412,8 +437,19 @@ export function activate(context: vscode.ExtensionContext): void {
       };
 
       const snoozeRemainingMs = getSnoozeRemainingMs();
+      const effectiveTerminalMonitoringCapability =
+        getEffectiveTerminalMonitoringCapability(
+          terminalMonitoringCapability,
+          settings.terminalDetectionMode,
+        );
       const terminalMonitoringDescription = terminalMonitoringSupported
-        ? "Watch shell output for errors"
+        ? effectiveTerminalMonitoringCapability === "none"
+          ? "Current detection mode is unsupported in this host"
+          : effectiveTerminalMonitoringCapability === "exitCodeOnly"
+          ? "Exit-code alerts only in this host"
+          : effectiveTerminalMonitoringCapability === "outputOnly"
+            ? "Output-stream alerts only in this host"
+          : "Watch shell output for errors"
         : "Unavailable in this Cursor/VS Code version";
       const actions: QuickAction[] = [
         {
@@ -586,11 +622,16 @@ export function activate(context: vscode.ExtensionContext): void {
         event.affectsConfiguration("faah.enabled") ||
         event.affectsConfiguration("faah.monitorDiagnostics") ||
         event.affectsConfiguration("faah.diagnosticsSeverity") ||
+        event.affectsConfiguration("faah.patternMode") ||
+        event.affectsConfiguration("faah.excludePresetIds") ||
         event.affectsConfiguration("faah.patterns") ||
         event.affectsConfiguration("faah.excludePatterns");
       const terminalStateAffects =
         event.affectsConfiguration("faah.enabled") ||
         event.affectsConfiguration("faah.monitorTerminal") ||
+        event.affectsConfiguration("faah.terminalDetectionMode") ||
+        event.affectsConfiguration("faah.patternMode") ||
+        event.affectsConfiguration("faah.excludePresetIds") ||
         event.affectsConfiguration("faah.patterns") ||
         event.affectsConfiguration("faah.excludePatterns");
       reloadSettingsFromConfiguration();
@@ -677,7 +718,11 @@ export function activate(context: vscode.ExtensionContext): void {
         }
 
         const onboardingMessage = terminalMonitoringSupported
-          ? "Faah is ready. Diagnostics and terminal monitoring are available in this host."
+          ? terminalMonitoringCapability === "exitCodeOnly"
+            ? "Faah is ready. Diagnostics alerts work, and terminal monitoring has partial host support: non-zero exit-code alerts work but output-stream monitoring is unavailable."
+            : terminalMonitoringCapability === "outputOnly"
+              ? "Faah is ready. Diagnostics alerts work, and terminal monitoring has partial host support: output-stream alerts work but non-zero exit-code monitoring is unavailable."
+            : "Faah is ready. Diagnostics and terminal monitoring are available in this host."
           : "Faah is ready. Diagnostics monitoring is available, but terminal monitoring is unavailable in this host.";
         const selection = await vscode.window.showInformationMessage(
           onboardingMessage,

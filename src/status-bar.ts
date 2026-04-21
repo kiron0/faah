@@ -2,16 +2,25 @@ import * as vscode from "vscode";
 
 import { commandIds } from "./commands";
 import type { RuntimeSettings } from "./settings";
+import {
+  getEffectiveTerminalMonitoringCapability,
+  type TerminalMonitoringCapability,
+} from "./terminal-shell-integration";
 
 type StatusBarRuntimeState = {
   snoozeRemainingMs?: number;
-  terminalMonitoringSupported?: boolean;
+  terminalMonitoringCapability?: TerminalMonitoringCapability;
 };
 
 function summarizeSources(
   settings: RuntimeSettings,
-  terminalMonitoringSupported: boolean,
+  terminalMonitoringCapability: TerminalMonitoringCapability,
 ): string {
+  const terminalMonitoringSupported =
+    getEffectiveTerminalMonitoringCapability(
+      terminalMonitoringCapability,
+      settings.terminalDetectionMode,
+    ) !== "none";
   const terminalMonitoringEnabled =
     settings.monitorTerminal && terminalMonitoringSupported;
 
@@ -60,11 +69,18 @@ export function createStatusBarController(): {
     settings: RuntimeSettings,
     runtimeState?: StatusBarRuntimeState,
   ): void => {
+    const terminalMonitoringCapability =
+      runtimeState?.terminalMonitoringCapability ?? "full";
+    const effectiveTerminalMonitoringCapability =
+      getEffectiveTerminalMonitoringCapability(
+        terminalMonitoringCapability,
+        settings.terminalDetectionMode,
+      );
     const terminalMonitoringSupported =
-      runtimeState?.terminalMonitoringSupported ?? true;
+      effectiveTerminalMonitoringCapability !== "none";
     const sourceSummary = summarizeSources(
       settings,
-      terminalMonitoringSupported,
+      terminalMonitoringCapability,
     );
     const snoozeRemainingMs = runtimeState?.snoozeRemainingMs ?? 0;
     const isSnoozed = snoozeRemainingMs > 0;
@@ -81,6 +97,9 @@ export function createStatusBarController(): {
     const unsupportedTerminalBadge =
       settings.monitorTerminal && !terminalMonitoringSupported
         ? " $(warning)"
+        : settings.monitorTerminal &&
+            effectiveTerminalMonitoringCapability !== "full"
+          ? " $(info)"
         : "";
     item.text = isSnoozed
       ? "$(bell-slash) Faah Snoozed"
@@ -89,7 +108,21 @@ export function createStatusBarController(): {
       `Sources: ${sourceSummary}`,
       `Diagnostics severity: ${describeDiagnosticsSeverity(settings)}`,
       ...(settings.monitorTerminal && !terminalMonitoringSupported
-        ? ["Terminal monitoring: unavailable in this Cursor/VS Code version."]
+        ? [
+            terminalMonitoringCapability === "none"
+              ? "Terminal monitoring: unavailable in this Cursor/VS Code version."
+              : "Terminal monitoring: current detection mode is unavailable in this host. Change Terminal Detection Mode to a supported signal.",
+          ]
+        : settings.monitorTerminal &&
+            effectiveTerminalMonitoringCapability === "exitCodeOnly"
+          ? [
+              "Terminal monitoring: partial host support. Exit-code alerts work, but output-stream monitoring is unavailable.",
+            ]
+        : settings.monitorTerminal &&
+            effectiveTerminalMonitoringCapability === "outputOnly"
+          ? [
+              "Terminal monitoring: partial host support. Output-stream alerts work, but exit-code monitoring is unavailable.",
+            ]
         : []),
       `Terminal cooldown: ${settings.terminalCooldownMs}ms`,
       `Diagnostics cooldown: ${settings.diagnosticsCooldownMs}ms`,

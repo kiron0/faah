@@ -8,6 +8,7 @@ function createStoredSettings(enabled: boolean): StoredSettings {
     monitorTerminal: true,
     monitorDiagnostics: true,
     diagnosticsSeverity: "error",
+    terminalDetectionMode: "either",
     cooldownMs: 1500,
     terminalCooldownMs: 1500,
     diagnosticsCooldownMs: 1500,
@@ -18,6 +19,7 @@ function createStoredSettings(enabled: boolean): StoredSettings {
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
     quietHoursEnd: "07:00",
+    excludePresetIds: ["conventionalCommits"],
     patterns: ["\\berror\\b"],
     excludePatterns: ["^ignore this$"],
   };
@@ -102,7 +104,7 @@ describe("settings webview unit tests", () => {
       () => createStoredSettings(true),
       async () => undefined,
       () => undefined,
-      true,
+      "full",
     );
 
     await commandHandler?.();
@@ -197,7 +199,7 @@ describe("settings webview unit tests", () => {
       () => createStoredSettings(true),
       async () => undefined,
       () => undefined,
-      true,
+      "full",
     );
 
     await commandHandler?.();
@@ -283,7 +285,7 @@ describe("settings webview unit tests", () => {
       () => createStoredSettings(true),
       async () => undefined,
       () => undefined,
-      true,
+      "full",
     );
 
     await commandHandler?.();
@@ -371,7 +373,7 @@ describe("settings webview unit tests", () => {
       () => currentSettings,
       async () => undefined,
       () => undefined,
-      true,
+      "full",
     );
 
     configChangeHandler?.({
@@ -466,7 +468,7 @@ describe("settings webview unit tests", () => {
       () => createStoredSettings(true),
       onSaved,
       () => undefined,
-      true,
+      "full",
     );
 
     await commandHandler?.();
@@ -482,6 +484,91 @@ describe("settings webview unit tests", () => {
       payload: createStoredSettings(true),
       target: "global",
       skippedConfigurationKeys: ["faah.showVisualNotifications"],
+    });
+  });
+
+  it("rejects unknown preset ids instead of silently applying a fallback preset", async () => {
+    vi.resetModules();
+
+    let commandHandler: (() => Promise<void>) | undefined;
+    let receiveHandler:
+      | ((message: {
+          type: string;
+          payload?: unknown;
+          target?: string;
+          presetId?: string;
+        }) => Promise<void>)
+      | undefined;
+    const postMessage = vi.fn();
+    const onSaved = vi.fn(async () => undefined);
+
+    const panel = {
+      webview: {
+        html: "",
+        cspSource: "vscode-webview",
+        asWebviewUri: vi.fn((uri: unknown) => uri),
+        postMessage,
+        onDidReceiveMessage: vi.fn((cb: typeof receiveHandler) => {
+          receiveHandler = cb;
+          return { dispose: vi.fn() };
+        }),
+      },
+      reveal: vi.fn(),
+      onDidDispose: vi.fn(() => ({ dispose: vi.fn() })),
+      iconPath: undefined as unknown,
+    };
+
+    vi.doMock("vscode", () => ({
+      commands: {
+        registerCommand: vi.fn((_id: string, cb: () => Promise<void>) => {
+          commandHandler = cb;
+          return { dispose: vi.fn() };
+        }),
+      },
+      workspace: {
+        workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
+        onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+      window: {
+        createWebviewPanel: vi.fn(() => panel),
+        showOpenDialog: vi.fn(async () => undefined),
+      },
+      Uri: {
+        joinPath: vi.fn(() => ({ path: "/tmp/icon.png" })),
+      },
+      ViewColumn: {
+        One: 1,
+      },
+      Disposable: {
+        from: (...disposables: Array<{ dispose: () => void }>) => ({
+          dispose: () => {
+            disposables.forEach((disposable) => disposable.dispose());
+          },
+        }),
+      },
+    }));
+
+    const settingsWebview = await import("../../src/settings-webview");
+
+    settingsWebview.registerSettingsUiCommand(
+      { extensionUri: { fsPath: "/tmp/ext" } } as any,
+      () => createStoredSettings(true),
+      onSaved,
+      () => undefined,
+      "full",
+    );
+
+    await commandHandler?.();
+    await receiveHandler?.({
+      type: "applyPreset",
+      presetId: "nope",
+      target: "global",
+    });
+
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "error",
+      payload: "Unknown settings preset: nope",
     });
   });
 });

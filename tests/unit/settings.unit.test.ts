@@ -27,11 +27,13 @@ describe("settings unit tests", () => {
       monitorTerminal: false,
       monitorDiagnostics: true,
       diagnosticsSeverity: "warningAndError",
+      terminalDetectionMode: "exitCode",
       cooldownMs: 100,
       volumePercent: 999,
       showVisualNotifications: true,
       customSoundPath: "   ./sounds/custom.wav   ",
       patternMode: "append",
+      excludePresetIds: ["lintSummaries", "invalid-preset" as any],
       patterns: ["   custom.*error   ", "   ", "", "panic"],
       excludePatterns: ["  ^ignore this$  ", "   "],
     });
@@ -40,13 +42,25 @@ describe("settings unit tests", () => {
     expect(normalized.monitorTerminal).toBe(false);
     expect(normalized.monitorDiagnostics).toBe(true);
     expect(normalized.diagnosticsSeverity).toBe("warningAndError");
+    expect(normalized.terminalDetectionMode).toBe("exitCode");
     expect(normalized.cooldownMs).toBe(500);
     expect(normalized.volumePercent).toBe(100);
     expect(normalized.showVisualNotifications).toBe(true);
     expect(normalized.customSoundPath).toBe("./sounds/custom.wav");
     expect(normalized.patternMode).toBe("append");
+    expect(normalized.excludePresetIds).toEqual(["lintSummaries"]);
     expect(normalized.patterns).toEqual(["custom.*error", "panic"]);
     expect(normalized.excludePatterns).toEqual(["^ignore this$"]);
+  });
+
+  it("falls back to either terminal detection mode when value is invalid", async () => {
+    const settings = await loadSettingsModule();
+
+    const normalized = settings.normalizeStoredSettings({
+      terminalDetectionMode: "invalid" as any,
+    });
+
+    expect(normalized.terminalDetectionMode).toBe("either");
   });
 
   it("falls back to override mode when pattern mode is invalid", async () => {
@@ -103,6 +117,42 @@ describe("settings unit tests", () => {
       settings.defaultStoredSettings.patterns.length,
     );
     expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses compiled regex arrays when the stored pattern inputs are unchanged", async () => {
+    const settings = await loadSettingsModule();
+    const stored = {
+      ...settings.defaultStoredSettings,
+      patternMode: "append" as const,
+      patterns: ["\\bmy_custom_error_token\\b"],
+      excludePatterns: ["^ignore this$"],
+    };
+
+    const first = settings.toRuntimeSettings(stored);
+    const second = settings.toRuntimeSettings({
+      ...stored,
+      patterns: [...stored.patterns],
+      excludePatterns: [...stored.excludePatterns],
+    });
+
+    expect(second.patterns).toBe(first.patterns);
+    expect(second.excludePatterns).toBe(first.excludePatterns);
+  });
+
+  it("includes exclude preset regexes in runtime settings", async () => {
+    const settings = await loadSettingsModule();
+
+    const runtime = settings.toRuntimeSettings({
+      ...settings.defaultStoredSettings,
+      excludePresetIds: ["lintSummaries"],
+      excludePatterns: [],
+    });
+
+    expect(
+      runtime.excludePatterns.some((pattern) =>
+        pattern.test("\u2716 3 problems ( 2 errors, 1 warnings )"),
+      ),
+    ).toBe(true);
   });
 
   it("persists to global settings by default even when a workspace is open", async () => {

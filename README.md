@@ -39,12 +39,14 @@ If your errors get dramatic — **Faah gets louder.**
 - Lightweight and fast, with regex-based error detection and configurable patterns/excludes
 - Separate cooldown controls for terminal and diagnostics sources
 - Terminal and editor diagnostics source toggles with diagnostics severity mode
+- Terminal detection mode control: output match, non-zero exit code, or either
 - Snooze controls (`15m`, `30m`, `1h`, `2h`) and clear snooze action
 - Quiet hours presets plus custom `HH:mm` ranges
 - Visual alerts (warning popups) plus audio for every alert
 - Quick presets (Balanced, Quiet, Aggressive) to snap into a mood
+- Built-in false-positive preset packs for common noisy output
 - Settings import/export (JSON) for backups or sharing
-- Compatibility status command and notice when terminal monitoring is unavailable
+- Compatibility status command with full/partial/unavailable terminal host reporting
 - Workspace-aware settings (`faah.*`) with auto-save Control Room UI
 - Status bar indicator with source-aware quick actions
 
@@ -57,6 +59,9 @@ Use Faah from the status bar quick actions or Command Palette.
 1. In VS Code, click `Faah Off`, `Faah T`, `Faah E`, or `Faah T+E` in the bottom bar.
 2. Choose what you want: turn Faah on/off, select terminal/editor/both, switch error mode, snooze alerts, set quiet hours, play test sound, or open full settings.
 3. Settings auto-save instantly in the Control Room; use the schedule presets, compatibility button, or import/export buttons for explicit actions.
+
+Faah also applies a tiny shared cross-source guard window so a terminal error and a diagnostics error fired at nearly the same moment do not double-play two alerts back-to-back.
+In Control Room, you can also switch terminal detection mode and enable built-in false-positive preset packs.
 
 Command Palette commands:
 
@@ -92,7 +97,7 @@ Faah just makes sure you hear it.
 
 ## Authors
 
-- [Md Shoaib Taimur](https://github.com/shoaibtaimur) (Idea)
+- [Md Shoaib Taimur](https://taimur.dev) (Idea)
 - [Toufiq Hasan Kiron](https://kiron.dev) (Developer)
 
 ## License

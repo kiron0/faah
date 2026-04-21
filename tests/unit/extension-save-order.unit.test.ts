@@ -8,6 +8,7 @@ function createStoredSettings(): StoredSettings {
     monitorTerminal: true,
     monitorDiagnostics: true,
     diagnosticsSeverity: "error",
+    terminalDetectionMode: "either",
     cooldownMs: 1500,
     terminalCooldownMs: 1500,
     diagnosticsCooldownMs: 1500,
@@ -18,6 +19,7 @@ function createStoredSettings(): StoredSettings {
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
     quietHoursEnd: "07:00",
+    excludePresetIds: ["conventionalCommits"],
     patterns: ["\\berror\\b"],
     excludePatterns: [
       "^\\[[^\\]]+\\s[0-9a-f]{7,40}\\]\\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\([^)]+\\))?!?:\\s.+$",
@@ -130,6 +132,10 @@ describe("extension save order regression", () => {
       tryPlayForExecution: vi.fn(),
     }));
     vi.doMock("../../src/terminal-shell-integration", () => ({
+      getEffectiveTerminalMonitoringCapability: vi.fn(
+        (capability: string) => capability,
+      ),
+      getTerminalMonitoringCapability: vi.fn(() => "none"),
       getTerminalShellExecutionApi: vi.fn(() => null),
       isExecutionIdentity: vi.fn(() => false),
       isTerminalExecutionLike: vi.fn(() => false),
@@ -261,6 +267,10 @@ describe("extension save order regression", () => {
       tryPlayForExecution: vi.fn(),
     }));
     vi.doMock("../../src/terminal-shell-integration", () => ({
+      getEffectiveTerminalMonitoringCapability: vi.fn(
+        (capability: string) => capability,
+      ),
+      getTerminalMonitoringCapability: vi.fn(() => "none"),
       getTerminalShellExecutionApi: vi.fn(() => null),
       isExecutionIdentity: vi.fn(() => false),
       isTerminalExecutionLike: vi.fn(() => false),

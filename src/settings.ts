@@ -5,7 +5,14 @@ const configurationSection = "faah";
 const minCooldownMs = 500;
 const patternModes = ["override", "append"] as const;
 const diagnosticsSeverityModes = ["error", "warningAndError"] as const;
+const terminalDetectionModes = ["either", "output", "exitCode"] as const;
 const settingsPresetIds = ["balanced", "quiet", "aggressive"] as const;
+const excludePresetIds = [
+  "conventionalCommits",
+  "testSnapshots",
+  "lintSummaries",
+  "packageManagerAdvisories",
+] as const;
 const quietHoursTimeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const defaultPatterns = [
@@ -43,19 +50,61 @@ const defaultExcludePatterns = [
   "^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\\([^)]+\\))?!?:\\s.+$",
 ] as const;
 
+export const excludePatternPresetDefinitions = [
+  {
+    id: "conventionalCommits",
+    label: "Conventional Commits",
+    description: "Ignore commit summary lines that mention error-like words.",
+    patterns: [...defaultExcludePatterns],
+  },
+  {
+    id: "testSnapshots",
+    label: "Test Snapshots",
+    description: "Ignore snapshot/test text that talks about expected errors.",
+    patterns: [
+      "^\\s*(?:PASS|SNAPSHOT)\\b.*\\berror\\b.*$",
+      "^\\s*Expected(?:.*)\\berror\\b.*$",
+      "^\\s*Received(?:.*)\\berror\\b.*$",
+    ],
+  },
+  {
+    id: "lintSummaries",
+    label: "Lint Summaries",
+    description: "Ignore summary banners that report counts without real failure lines.",
+    patterns: [
+      "^\\s*\\d+\\s+warnings?(?:,\\s*\\d+\\s+errors?)?\\s*$",
+      "^\\s*\\d+\\s+errors?,\\s*\\d+\\s+warnings?\\s*$",
+      "^\\s*\\u2716\\s+\\d+\\s+problems?\\s*\\(\\s*\\d+\\s+errors?,\\s*\\d+\\s+warnings?\\s*\\)\\s*$",
+    ],
+  },
+  {
+    id: "packageManagerAdvisories",
+    label: "Package Manager Advisories",
+    description: "Ignore package-manager audit/advisory summaries unless command actually fails.",
+    patterns: [
+      "^\\s*(?:npm|yarn|pnpm|bun)\\s+(?:audit|advisory)\\b.*$",
+      "^\\s*found\\s+\\d+\\s+vulnerabilit(?:y|ies)\\b.*$",
+      "^\\s*\\d+\\s+packages?\\s+are\\s+looking\\s+for\\s+funding\\s*$",
+    ],
+  },
+] as const;
+
 const defaultCompiledPatterns = defaultPatterns.map(
   (pattern) => new RegExp(pattern, "i"),
 );
 
 export type PatternMode = (typeof patternModes)[number];
 export type DiagnosticsSeverityMode = (typeof diagnosticsSeverityModes)[number];
+export type TerminalDetectionMode = (typeof terminalDetectionModes)[number];
 export type SettingsPresetId = (typeof settingsPresetIds)[number];
+export type ExcludePresetId = (typeof excludePresetIds)[number];
 
 export type StoredSettings = {
   enabled: boolean;
   monitorTerminal: boolean;
   monitorDiagnostics: boolean;
   diagnosticsSeverity: DiagnosticsSeverityMode;
+  terminalDetectionMode: TerminalDetectionMode;
   cooldownMs: number;
   terminalCooldownMs: number;
   diagnosticsCooldownMs: number;
@@ -66,6 +115,7 @@ export type StoredSettings = {
   quietHoursEnabled: boolean;
   quietHoursStart: string;
   quietHoursEnd: string;
+  excludePresetIds: ExcludePresetId[];
   patterns: string[];
   excludePatterns: string[];
 };
@@ -75,6 +125,7 @@ export type RuntimeSettings = {
   monitorTerminal: boolean;
   monitorDiagnostics: boolean;
   diagnosticsSeverity: DiagnosticsSeverityMode;
+  terminalDetectionMode: TerminalDetectionMode;
   cooldownMs: number;
   terminalCooldownMs: number;
   diagnosticsCooldownMs: number;
@@ -84,6 +135,7 @@ export type RuntimeSettings = {
   quietHoursEnabled: boolean;
   quietHoursStart: string;
   quietHoursEnd: string;
+  excludePresetIds: ExcludePresetId[];
   patterns: RegExp[];
   excludePatterns: RegExp[];
 };
@@ -93,6 +145,7 @@ export const defaultStoredSettings: StoredSettings = {
   monitorTerminal: true,
   monitorDiagnostics: true,
   diagnosticsSeverity: "error",
+  terminalDetectionMode: "either",
   cooldownMs: 1500,
   terminalCooldownMs: 1500,
   diagnosticsCooldownMs: 1500,
@@ -103,11 +156,12 @@ export const defaultStoredSettings: StoredSettings = {
   quietHoursEnabled: false,
   quietHoursStart: "22:00",
   quietHoursEnd: "07:00",
+  excludePresetIds: [],
   patterns: [...defaultPatterns],
   excludePatterns: [...defaultExcludePatterns],
 };
 
-export type SettingsPersistTarget = "auto" | "workspace" | "global";
+export type SettingsPersistTarget = "workspace" | "global";
 
 export type PersistStoredSettingsResult = {
   skippedConfigurationKeys: string[];
@@ -116,6 +170,14 @@ export type PersistStoredSettingsResult = {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+
+type CompiledRegexCacheEntry = {
+  key: string;
+  patterns: RegExp[];
+  excludePatterns: RegExp[];
+};
+
+let compiledRegexCache: CompiledRegexCacheEntry | null = null;
 
 function parseEnum<T extends string>(
   value: string | undefined,
@@ -142,6 +204,17 @@ function compileRegexList(
       }
     })
     .filter((pattern): pattern is RegExp => pattern !== null);
+}
+
+function getExcludePresetPatterns(
+  presetIdsToResolve: readonly ExcludePresetId[],
+): string[] {
+  return presetIdsToResolve.flatMap((presetId) => {
+    const presetDefinition = excludePatternPresetDefinitions.find(
+      (preset) => preset.id === presetId,
+    );
+    return presetDefinition ? [...presetDefinition.patterns] : [];
+  });
 }
 
 export function isValidQuietHoursTime(value: string): boolean {
@@ -201,7 +274,6 @@ function resolveConfigurationTarget(
     return vscode.ConfigurationTarget.Workspace;
   if (target === "workspace" && !hasWorkspace)
     return vscode.ConfigurationTarget.Global;
-  if (target === "auto") return vscode.ConfigurationTarget.Global;
   return vscode.ConfigurationTarget.Global;
 }
 
@@ -241,6 +313,11 @@ export function normalizeStoredSettings(
       source.diagnosticsSeverity,
       diagnosticsSeverityModes,
       defaultStoredSettings.diagnosticsSeverity,
+    ),
+    terminalDetectionMode: parseEnum(
+      source.terminalDetectionMode,
+      terminalDetectionModes,
+      defaultStoredSettings.terminalDetectionMode,
     ),
     cooldownMs: fallbackCooldownMs,
     terminalCooldownMs: Math.max(
@@ -287,6 +364,11 @@ export function normalizeStoredSettings(
       source.quietHoursEnd,
       defaultStoredSettings.quietHoursEnd,
     ),
+    excludePresetIds: Array.isArray(source.excludePresetIds)
+      ? source.excludePresetIds.filter((item): item is ExcludePresetId =>
+          (excludePresetIds as readonly string[]).includes(String(item)),
+        )
+      : [...defaultStoredSettings.excludePresetIds],
     patterns: rawPatterns
       .map((pattern) => pattern.trim())
       .filter((pattern) => pattern.length > 0),
@@ -297,20 +379,41 @@ export function normalizeStoredSettings(
 }
 
 export function toRuntimeSettings(stored: StoredSettings): RuntimeSettings {
-  const userPatterns = compileRegexList(stored.patterns, "pattern");
-  const excludePatterns = compileRegexList(stored.excludePatterns, "exclude");
-  const patterns =
-    stored.patternMode === "append"
-      ? [...defaultCompiledPatterns, ...userPatterns]
-      : userPatterns.length > 0
-        ? userPatterns
-        : defaultCompiledPatterns;
+  const cacheKey = JSON.stringify({
+    patternMode: stored.patternMode,
+    excludePresetIds: stored.excludePresetIds,
+    patterns: stored.patterns,
+    excludePatterns: stored.excludePatterns,
+  });
+  if (!compiledRegexCache || compiledRegexCache.key !== cacheKey) {
+    const userPatterns = compileRegexList(stored.patterns, "pattern");
+    const presetExcludePatterns = getExcludePresetPatterns(
+      stored.excludePresetIds,
+    );
+    const excludePatterns = compileRegexList(
+      [...presetExcludePatterns, ...stored.excludePatterns],
+      "exclude",
+    );
+    const patterns =
+      stored.patternMode === "append"
+        ? [...defaultCompiledPatterns, ...userPatterns]
+        : userPatterns.length > 0
+          ? userPatterns
+          : defaultCompiledPatterns;
+
+    compiledRegexCache = {
+      key: cacheKey,
+      patterns,
+      excludePatterns,
+    };
+  }
 
   return {
     enabled: stored.enabled,
     monitorTerminal: stored.monitorTerminal,
     monitorDiagnostics: stored.monitorDiagnostics,
     diagnosticsSeverity: stored.diagnosticsSeverity,
+    terminalDetectionMode: stored.terminalDetectionMode,
     cooldownMs: stored.cooldownMs,
     terminalCooldownMs: stored.terminalCooldownMs,
     diagnosticsCooldownMs: stored.diagnosticsCooldownMs,
@@ -320,8 +423,9 @@ export function toRuntimeSettings(stored: StoredSettings): RuntimeSettings {
     quietHoursEnabled: stored.quietHoursEnabled,
     quietHoursStart: stored.quietHoursStart,
     quietHoursEnd: stored.quietHoursEnd,
-    patterns,
-    excludePatterns,
+    excludePresetIds: stored.excludePresetIds,
+    patterns: compiledRegexCache.patterns,
+    excludePatterns: compiledRegexCache.excludePatterns,
   };
 }
 
@@ -358,6 +462,14 @@ export function loadStoredSettings(
     );
   if (diagnosticsSeverity !== undefined)
     configOverrides.diagnosticsSeverity = diagnosticsSeverity;
+  const terminalDetectionMode =
+    readConfigurationOverride<TerminalDetectionMode>(
+      config,
+      "terminalDetectionMode",
+    );
+  if (terminalDetectionMode !== undefined) {
+    configOverrides.terminalDetectionMode = terminalDetectionMode;
+  }
 
   const cooldownMs = readConfigurationOverride<number>(config, "cooldownMs");
   if (cooldownMs !== undefined) configOverrides.cooldownMs = cooldownMs;
@@ -420,6 +532,13 @@ export function loadStoredSettings(
   );
   if (quietHoursEnd !== undefined)
     configOverrides.quietHoursEnd = quietHoursEnd;
+  const excludePresetIdsValue = readConfigurationOverride<ExcludePresetId[]>(
+    config,
+    "excludePresetIds",
+  );
+  if (excludePresetIdsValue !== undefined) {
+    configOverrides.excludePresetIds = excludePresetIdsValue;
+  }
 
   const patterns = readConfigurationOverride<string[]>(config, "patterns");
   if (patterns !== undefined) configOverrides.patterns = patterns;
@@ -442,7 +561,7 @@ export function loadStoredSettings(
 export async function persistStoredSettings(
   context: vscode.ExtensionContext,
   settings: StoredSettings,
-  target: SettingsPersistTarget = "auto",
+  target: SettingsPersistTarget = "global",
 ): Promise<PersistStoredSettingsResult> {
   const config = vscode.workspace.getConfiguration(configurationSection);
   const configurationTarget = resolveConfigurationTarget(target);
@@ -474,6 +593,13 @@ export async function persistStoredSettings(
       config,
       "diagnosticsSeverity",
       settings.diagnosticsSeverity,
+      configurationTarget,
+      skippedConfigurationKeys,
+    ),
+    updateConfigurationValue(
+      config,
+      "terminalDetectionMode",
+      settings.terminalDetectionMode,
       configurationTarget,
       skippedConfigurationKeys,
     ),
@@ -549,6 +675,13 @@ export async function persistStoredSettings(
     ),
     updateConfigurationValue(
       config,
+      "excludePresetIds",
+      settings.excludePresetIds,
+      configurationTarget,
+      skippedConfigurationKeys,
+    ),
+    updateConfigurationValue(
+      config,
       "patterns",
       settings.patterns,
       configurationTarget,
@@ -583,6 +716,7 @@ export function createPresetSettings(
         monitorTerminal,
         monitorDiagnostics: true,
         diagnosticsSeverity: "error",
+        terminalDetectionMode: "either",
         cooldownMs: 5000,
         terminalCooldownMs: 4500,
         diagnosticsCooldownMs: 5000,
@@ -599,6 +733,7 @@ export function createPresetSettings(
         monitorTerminal,
         monitorDiagnostics: true,
         diagnosticsSeverity: "warningAndError",
+        terminalDetectionMode: "either",
         cooldownMs: 700,
         terminalCooldownMs: 700,
         diagnosticsCooldownMs: 700,
@@ -614,6 +749,7 @@ export function createPresetSettings(
         monitorTerminal,
         monitorDiagnostics: true,
         diagnosticsSeverity: "error",
+        terminalDetectionMode: "either",
         cooldownMs: 1500,
         terminalCooldownMs: 1500,
         diagnosticsCooldownMs: 1500,

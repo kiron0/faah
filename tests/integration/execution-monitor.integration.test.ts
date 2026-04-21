@@ -24,6 +24,7 @@ function createSettings(
     monitorTerminal: true,
     monitorDiagnostics: true,
     diagnosticsSeverity: "error",
+    terminalDetectionMode: "either",
     cooldownMs: 0,
     terminalCooldownMs: 0,
     diagnosticsCooldownMs: 0,
@@ -33,6 +34,7 @@ function createSettings(
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
     quietHoursEnd: "07:00",
+    excludePresetIds: ["conventionalCommits"],
     patterns: [/error/i],
     excludePatterns: [
       /^\[[^\]]+\s[0-9a-f]{7,40}\]\s(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^)]+\))?!?:\s.+$/i,
@@ -68,6 +70,21 @@ describe("execution monitor integration tests", () => {
     expect(playAlert).toHaveBeenCalledWith(settings, "media/faah.wav");
   });
 
+  it("plays alert when final stream line has no trailing newline", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution(["build failed: error happened"]) as any;
+    const settings = createSettings();
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(playAlert).toHaveBeenCalledTimes(1);
+    expect(playAlert).toHaveBeenCalledWith(settings, "media/faah.wav");
+  });
+
   it("does not play alert when monitoring is disabled", async () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
     const execution = createExecution(["error happened\n"]) as any;
@@ -86,6 +103,20 @@ describe("execution monitor integration tests", () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
     const execution = createExecution(["error happened\n"]) as any;
     const settings = createSettings({ monitorTerminal: false });
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(playAlert).not.toHaveBeenCalled();
+  });
+
+  it("skips output-triggered alerts when terminal detection mode is exit-code only", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution(["error happened\n"]) as any;
+    const settings = createSettings({ terminalDetectionMode: "exitCode" });
 
     await executionMonitor.monitorExecutionOutput(
       execution,
@@ -137,6 +168,16 @@ describe("execution monitor integration tests", () => {
     executionMonitor.tryPlayForExecution(execution, settings, "media/faah.wav");
 
     expect(playAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips exit-code-triggered alerts when terminal detection mode is output only", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution([]) as any;
+    const settings = createSettings({ terminalDetectionMode: "output" });
+
+    executionMonitor.tryPlayForExecution(execution, settings, "media/faah.wav");
+
+    expect(playAlert).not.toHaveBeenCalled();
   });
 
   it("allows the same execution to alert again after the monitor state is reset", async () => {

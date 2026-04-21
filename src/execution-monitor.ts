@@ -16,6 +16,14 @@ const MAX_TAIL_LENGTH = 500;
 const LINE_SPLIT_REGEX = /\r?\n/;
 const ANSI_ESCAPE_REGEX = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 
+function shouldMonitorTerminalOutput(settings: RuntimeSettings): boolean {
+  return settings.terminalDetectionMode !== "exitCode";
+}
+
+function shouldMonitorTerminalExitCode(settings: RuntimeSettings): boolean {
+  return settings.terminalDetectionMode !== "output";
+}
+
 function looksLikeError(line: string, patterns: readonly RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(line));
 }
@@ -26,6 +34,18 @@ function isExcluded(line: string, excludePatterns: readonly RegExp[]): boolean {
 
 function normalizeTerminalLine(text: string): string {
   return text.replace(ANSI_ESCAPE_REGEX, "").trim();
+}
+
+function matchesAlertPatterns(
+  text: string,
+  patterns: readonly RegExp[],
+  excludePatterns: readonly RegExp[],
+): boolean {
+  const line = normalizeTerminalLine(text);
+  if (!line) return false;
+  if (!looksLikeError(line, patterns)) return false;
+  if (isExcluded(line, excludePatterns)) return false;
+  return true;
 }
 
 function hasErrorInChunk(
@@ -41,11 +61,7 @@ function hasErrorInChunk(
   tailByExecution.set(execution, tail.slice(-MAX_TAIL_LENGTH));
 
   for (const rawLine of lines) {
-    const line = normalizeTerminalLine(rawLine);
-    if (!line) continue;
-    if (!looksLikeError(line, patterns)) continue;
-    if (isExcluded(line, excludePatterns)) continue;
-    return true;
+    if (matchesAlertPatterns(rawLine, patterns, excludePatterns)) return true;
   }
 
   return false;
@@ -57,6 +73,7 @@ export function tryPlayForExecution(
   soundPath: string,
 ): void {
   if (!settings.monitorTerminal) return;
+  if (!shouldMonitorTerminalExitCode(settings)) return;
   if (getAlertSuppressionReason(settings) !== null) return;
   if (playedByExecution.has(execution)) return;
   if (!tryAcquirePlaybackWindow(settings.terminalCooldownMs, "terminal"))
@@ -79,6 +96,7 @@ export async function monitorExecutionOutput(
       const settings = getSettings();
       if (!settings.enabled) continue;
       if (!settings.monitorTerminal) continue;
+      if (!shouldMonitorTerminalOutput(settings)) continue;
 
       if (
         hasErrorInChunk(
@@ -90,6 +108,17 @@ export async function monitorExecutionOutput(
       ) {
         tryPlayForExecution(execution, settings, getSoundPath());
       }
+    }
+
+    const settings = getSettings();
+    const finalTail = tailByExecution.get(execution) ?? "";
+    if (
+      settings.enabled &&
+      settings.monitorTerminal &&
+      shouldMonitorTerminalOutput(settings) &&
+      matchesAlertPatterns(finalTail, settings.patterns, settings.excludePatterns)
+    ) {
+      tryPlayForExecution(execution, settings, getSoundPath());
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -5,12 +5,14 @@ import { commandIds } from "./commands";
 import {
   createPresetSettings,
   defaultStoredSettings,
+  excludePatternPresetDefinitions,
   type PersistStoredSettingsResult,
   normalizeStoredSettings,
   type SettingsPersistTarget,
   type SettingsPresetId,
   type StoredSettings,
 } from "./settings";
+import type { TerminalMonitoringCapability } from "./terminal-shell-integration";
 
 function getNonce(): string {
   const chars =
@@ -23,6 +25,11 @@ function getNonce(): string {
 }
 
 export const saveTargetStorageKey = "faah.settings.saveTarget.v1";
+const validPresetIds = new Set<SettingsPresetId>([
+  "balanced",
+  "quiet",
+  "aggressive",
+]);
 
 function normalizeSaveTarget(
   value: unknown,
@@ -50,7 +57,7 @@ function renderSettingsWebview(
   context: vscode.ExtensionContext,
   settings: StoredSettings,
   hasWorkspace: boolean,
-  terminalMonitoringSupported: boolean,
+  terminalMonitoringCapability: TerminalMonitoringCapability,
   initialSaveTarget: SettingsPersistTarget = "global",
 ): string {
   const nonce = getNonce();
@@ -58,13 +65,19 @@ function renderSettingsWebview(
     vscode.Uri.joinPath(context.extensionUri, "images", "icon.png"),
   );
   const bootSettings = JSON.stringify(settings).replace(/</g, "\\u003c");
+  const terminalMonitoringSupported = terminalMonitoringCapability !== "none";
   const selectedSaveTarget = normalizeSaveTarget(
     initialSaveTarget,
     hasWorkspace,
   );
-  const terminalStatusMessage = terminalMonitoringSupported
-    ? "Terminal monitoring is available in this host."
-    : "Terminal monitoring is unavailable in this host. Diagnostics alerts still work normally.";
+  const terminalStatusMessage =
+    terminalMonitoringCapability === "full"
+      ? "Terminal monitoring is fully available in this host."
+      : terminalMonitoringCapability === "exitCodeOnly"
+        ? "Terminal monitoring has partial host support here. Non-zero exit-code alerts work, but output-stream monitoring is unavailable."
+        : terminalMonitoringCapability === "outputOnly"
+          ? "Terminal monitoring has partial host support here. Output-stream alerts work, but non-zero exit-code monitoring is unavailable."
+        : "Terminal monitoring is unavailable in this host. Diagnostics alerts still work normally.";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -553,7 +566,11 @@ function renderSettingsWebview(
             <div>Terminal Output</div>
             <div class="hint">${
               terminalMonitoringSupported
-                ? "Play alerts for terminal command output."
+                ? terminalMonitoringCapability === "exitCodeOnly"
+                  ? "This host only supports terminal exit-code alerts. Output-stream monitoring is unavailable here."
+                  : terminalMonitoringCapability === "outputOnly"
+                    ? "This host only supports terminal output-stream alerts. Non-zero exit-code monitoring is unavailable here."
+                  : "Play alerts for terminal command output."
                 : "Unavailable in this host. Your saved preference is preserved, but runtime monitoring is disabled here."
             }</div>
           </div>
@@ -573,6 +590,13 @@ function renderSettingsWebview(
           <option value="error">Error only</option>
           <option value="warningAndError">Error + Warning</option>
         </select>
+        <label for="terminalDetectionMode" style="margin-top: 12px;">Terminal Detection Mode</label>
+        <select id="terminalDetectionMode">
+          <option value="either">Output match or non-zero exit</option>
+          <option value="output">Output match only</option>
+          <option value="exitCode">Non-zero exit only</option>
+        </select>
+        <div class="hint">Use output-only to ignore expected non-zero exits, or exit-only to ignore noisy logs.</div>
       </article>
 
       <article class="card">
@@ -687,6 +711,12 @@ function renderSettingsWebview(
       </article>
 
       <article class="card full">
+        <label>False-Positive Presets</label>
+        <div id="excludePresetOptions" class="radio-group" role="group" aria-label="Exclude pattern presets"></div>
+        <div class="hint">Preset groups add built-in exclude regexes for common noisy output.</div>
+      </article>
+
+      <article class="card full">
         <label>Regex Validation Preview</label>
         <p id="regexValidationSummary" class="validation-summary">No patterns to validate yet.</p>
         <ul id="invalidPatternList" class="validation-list hidden" aria-label="Invalid custom patterns"></ul>
@@ -728,6 +758,7 @@ function renderSettingsWebview(
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const defaults = ${JSON.stringify(defaultStoredSettings).replace(/</g, "\\u003c")};
+    const excludePresetDefinitions = ${JSON.stringify(excludePatternPresetDefinitions).replace(/</g, "\\u003c")};
     const initial = ${bootSettings};
     let hasWorkspace = ${JSON.stringify(hasWorkspace)};
     const terminalMonitoringSupported = ${JSON.stringify(terminalMonitoringSupported)};
@@ -738,6 +769,7 @@ function renderSettingsWebview(
       monitorTerminalSwitch: document.getElementById("monitorTerminalSwitch"),
       monitorDiagnosticsSwitch: document.getElementById("monitorDiagnosticsSwitch"),
       diagnosticsSeverity: document.getElementById("diagnosticsSeverity"),
+      terminalDetectionMode: document.getElementById("terminalDetectionMode"),
       terminalCooldownMs: document.getElementById("terminalCooldownMs"),
       terminalCooldownLabel: document.getElementById("terminalCooldownLabel"),
       diagnosticsCooldownMs: document.getElementById("diagnosticsCooldownMs"),
@@ -758,6 +790,7 @@ function renderSettingsWebview(
       patternModeAppend: document.getElementById("patternModeAppend"),
       patterns: document.getElementById("patterns"),
       excludePatterns: document.getElementById("excludePatterns"),
+      excludePresetOptions: document.getElementById("excludePresetOptions"),
       regexValidationSummary: document.getElementById("regexValidationSummary"),
       invalidPatternList: document.getElementById("invalidPatternList"),
       invalidExcludePatternList: document.getElementById("invalidExcludePatternList"),
@@ -823,6 +856,10 @@ function renderSettingsWebview(
       setSwitchState(ui.quietHoursSwitch, quietHoursEnabled);
       ui.diagnosticsSeverity.value =
         settings.diagnosticsSeverity === "warningAndError" ? "warningAndError" : "error";
+      ui.terminalDetectionMode.value =
+        settings.terminalDetectionMode === "output" || settings.terminalDetectionMode === "exitCode"
+          ? settings.terminalDetectionMode
+          : "either";
       ui.terminalCooldownMs.value = String(
         Math.max(500, settings.terminalCooldownMs ?? settings.cooldownMs ?? 1500),
       );
@@ -845,6 +882,7 @@ function renderSettingsWebview(
       ui.excludePatterns.value = Array.isArray(settings.excludePatterns)
         ? settings.excludePatterns.join("\\n")
         : "";
+      syncExcludePresetOptions(Array.isArray(settings.excludePresetIds) ? settings.excludePresetIds : []);
       syncTerminalCooldownLabel();
       syncDiagnosticsCooldownLabel();
       syncVolumeLabel();
@@ -901,6 +939,50 @@ function renderSettingsWebview(
           }
         })
         .filter((entry) => entry !== null);
+    }
+
+    function renderExcludePresetOptions() {
+      const options = Array.isArray(excludePresetDefinitions)
+        ? excludePresetDefinitions.map((preset) => {
+            const label = document.createElement("label");
+            label.className = "radio-option";
+            label.htmlFor = "excludePreset-" + preset.id;
+
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.id = "excludePreset-" + preset.id;
+            input.value = preset.id;
+            input.dataset.presetId = preset.id;
+
+            const textWrap = document.createElement("span");
+            textWrap.textContent = preset.label + " - " + preset.description;
+
+            label.appendChild(input);
+            label.appendChild(textWrap);
+            return label;
+          })
+        : [];
+
+      ui.excludePresetOptions.replaceChildren(...options);
+    }
+
+    function syncExcludePresetOptions(selectedPresetIds) {
+      const selected = new Set(
+        Array.isArray(selectedPresetIds)
+          ? selectedPresetIds.filter((item) => typeof item === "string")
+          : [],
+      );
+      for (const input of ui.excludePresetOptions.querySelectorAll("input[type='checkbox']")) {
+        input.checked = selected.has(input.dataset.presetId || "");
+      }
+    }
+
+    function collectExcludePresetIds() {
+      return Array.from(
+        ui.excludePresetOptions.querySelectorAll("input[type='checkbox']:checked"),
+      )
+        .map((input) => input.dataset.presetId || "")
+        .filter((value) => value.length > 0);
     }
 
     function renderValidationList(element, title, entries) {
@@ -970,6 +1052,10 @@ function renderSettingsWebview(
         quietHoursEnabled,
         diagnosticsSeverity:
           ui.diagnosticsSeverity.value === "warningAndError" ? "warningAndError" : "error",
+        terminalDetectionMode:
+          ui.terminalDetectionMode.value === "output" || ui.terminalDetectionMode.value === "exitCode"
+            ? ui.terminalDetectionMode.value
+            : "either",
         cooldownMs: Math.max(terminalCooldownMs, diagnosticsCooldownMs),
         terminalCooldownMs,
         diagnosticsCooldownMs,
@@ -977,6 +1063,7 @@ function renderSettingsWebview(
         customSoundPath: customSoundPath.trim(),
         quietHoursStart: ui.quietHoursStart.value || "22:00",
         quietHoursEnd: ui.quietHoursEnd.value || "07:00",
+        excludePresetIds: collectExcludePresetIds(),
         patternMode: getPatternMode(),
         patterns: ui.patterns.value
           .split(/\\r?\\n/)
@@ -1171,6 +1258,13 @@ function renderSettingsWebview(
     ui.diagnosticsSeverity.addEventListener("change", () => {
       markChanged();
     });
+    ui.terminalDetectionMode.addEventListener("change", () => {
+      markChanged();
+    });
+    ui.saveTarget.addEventListener("change", () => {
+      flashPill("Save scope changed. Auto-saving current settings...");
+      requestSave(true);
+    });
     ui.quietHoursStart.addEventListener("input", () => {
       markChanged();
     });
@@ -1183,6 +1277,9 @@ function renderSettingsWebview(
     });
     ui.excludePatterns.addEventListener("input", () => {
       syncRegexValidation();
+      markChanged(textAutoSaveDebounceMs);
+    });
+    ui.excludePresetOptions.addEventListener("change", () => {
       markChanged(textAutoSaveDebounceMs);
     });
     ui.patternModeOverride.addEventListener("change", () => {
@@ -1294,6 +1391,7 @@ function renderSettingsWebview(
       }
     });
 
+    renderExcludePresetOptions();
     applySettings(initial);
     latestSavedSignature = createSettingsSignature(collectSettings());
   </script>
@@ -1309,7 +1407,7 @@ export function registerSettingsUiCommand(
     target: SettingsPersistTarget,
   ) => Promise<void | PersistStoredSettingsResult>,
   onTest: (settings: StoredSettings) => void,
-  terminalMonitoringSupported: boolean,
+  terminalMonitoringCapability: TerminalMonitoringCapability,
   commandId = commandIds.openSettingsUi,
 ): vscode.Disposable {
   let panel: vscode.WebviewPanel | undefined;
@@ -1338,12 +1436,12 @@ export function registerSettingsUiCommand(
   function renderPanelHtml(): string {
     return renderSettingsWebview(
       panel!.webview,
-      context,
-      getStoredSettings(),
-      hasWorkspaceOpen(),
-      terminalMonitoringSupported,
-      getInitialSaveTarget(),
-    );
+        context,
+        getStoredSettings(),
+        hasWorkspaceOpen(),
+        terminalMonitoringCapability,
+        getInitialSaveTarget(),
+      );
   }
 
   const commandDisposable = vscode.commands.registerCommand(
@@ -1421,12 +1519,15 @@ export function registerSettingsUiCommand(
 
         if (message.type === "applyPreset") {
           try {
-            const presetId = String(message.presetId ?? "") as SettingsPresetId;
+            const presetId = String(message.presetId ?? "");
+            if (!validPresetIds.has(presetId as SettingsPresetId)) {
+              throw new Error(`Unknown settings preset: ${presetId}`);
+            }
             const persistTarget = getPersistTargetFromMessage(message.target);
             const presetSettings = createPresetSettings(
               getStoredSettings(),
-              presetId,
-              terminalMonitoringSupported,
+              presetId as SettingsPresetId,
+              terminalMonitoringCapability !== "none",
             );
             const savedResult = await onSaved(presetSettings, persistTarget);
             await rememberSaveTarget(context, persistTarget);
