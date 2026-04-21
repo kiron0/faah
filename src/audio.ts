@@ -229,6 +229,49 @@ function playWindowsBeepFallback(volumePercent: number): void {
   });
 }
 
+function playOnWindowsWithSoundPlayer(
+  soundPath: string,
+  settings: RuntimeSettings,
+): void {
+  const escapedSoundPath = escapePowerShellSingleQuoted(soundPath);
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    `$sp = New-Object System.Media.SoundPlayer '${escapedSoundPath}'`,
+    "$sp.PlaySync()",
+  ].join("; ");
+
+  const playbackProcess = spawn(
+    "powershell",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      script,
+    ],
+    {
+      stdio: "ignore",
+      windowsHide: true,
+    },
+  );
+
+  playbackProcess.on("error", (err) => {
+    warnWindowsFallbackOnce(
+      `Failed to play sound with Windows SoundPlayer. Falling back to console beep. Error: ${err.message}`,
+    );
+    playWindowsBeepFallback(settings.volumePercent);
+  });
+
+  playbackProcess.on("close", (code) => {
+    if (code === 0 || code === null) return;
+    warnWindowsFallbackOnce(
+      `Windows SoundPlayer exited with code ${code}. Falling back to console beep.`,
+    );
+    playWindowsBeepFallback(settings.volumePercent);
+  });
+}
+
 function playOnWindows(soundPath: string, settings: RuntimeSettings): void {
   const escapedSoundPath = escapePowerShellSingleQuoted(soundPath);
   const volumeRatio = clamp(settings.volumePercent, 0, 100) / 100;
@@ -236,16 +279,15 @@ function playOnWindows(soundPath: string, settings: RuntimeSettings): void {
     "$ErrorActionPreference = 'Stop'",
     "Add-Type -AssemblyName PresentationCore",
     `$path = '${escapedSoundPath}'`,
-    'if (-not (Test-Path -LiteralPath $path)) { throw "Sound file not found" }',
     "$player = New-Object System.Windows.Media.MediaPlayer",
     `$player.Volume = ${volumeRatio.toFixed(2)}`,
     "$player.Open([Uri]::new($path))",
-    "$loadTimeoutAt = (Get-Date).AddSeconds(5)",
-    "while (-not $player.NaturalDuration.HasTimeSpan -and (Get-Date) -lt $loadTimeoutAt) { Start-Sleep -Milliseconds 50 }",
     "$player.Play()",
+    "$durationDeadline = (Get-Date).AddMilliseconds(800)",
+    "while (-not $player.NaturalDuration.HasTimeSpan -and (Get-Date) -lt $durationDeadline) { Start-Sleep -Milliseconds 15 }",
     "$waitMs = 2000",
     "if ($player.NaturalDuration.HasTimeSpan) {",
-    "  $waitMs = [Math]::Min(15000, [Math]::Max(300, [int]([Math]::Ceiling($player.NaturalDuration.TimeSpan.TotalMilliseconds) + 150)))",
+    "  $waitMs = [Math]::Min(15000, [Math]::Max(300, [int]([Math]::Ceiling($player.NaturalDuration.TimeSpan.TotalMilliseconds) + 120)))",
     "}",
     "Start-Sleep -Milliseconds $waitMs",
     "$player.Stop()",
@@ -332,7 +374,7 @@ function playCustomFileWithVolume(
 
   if (isWindows) {
     if (settings.volumePercent === 100) {
-      playWithoutVolume(soundPath);
+      playOnWindowsWithSoundPlayer(soundPath, settings);
       return;
     }
     playOnWindows(soundPath, settings);
