@@ -467,16 +467,16 @@ export function activate(context: vscode.ExtensionContext): void {
     async () => {
       type QuickAction = vscode.QuickPickItem & {
         action:
-        | "toggleEnabled"
-        | "toggleTerminal"
-        | "toggleDiagnostics"
-        | "toggleDiagnosticsSeverity"
-        | "snooze"
-        | "clearSnooze"
-        | "setQuietHours"
-        | "openSettings"
-        | "showCompatibility"
-        | "playTestSound";
+          | "toggleEnabled"
+          | "toggleTerminal"
+          | "toggleDiagnostics"
+          | "toggleDiagnosticsSeverity"
+          | "snooze"
+          | "clearSnooze"
+          | "setQuietHours"
+          | "openSettings"
+          | "showCompatibility"
+          | "playTestSound";
       };
 
       const snoozeRemainingMs = getSnoozeRemainingMs();
@@ -535,12 +535,12 @@ export function activate(context: vscode.ExtensionContext): void {
         },
         ...(snoozeRemainingMs > 0
           ? [
-            {
-              label: "Clear Snooze",
-              description: "Resume alerts immediately",
-              action: "clearSnooze" as const,
-            },
-          ]
+              {
+                label: "Clear Snooze",
+                description: "Resume alerts immediately",
+                action: "clearSnooze" as const,
+              },
+            ]
           : []),
         {
           label: settings.quietHoursEnabled
@@ -848,4 +848,4 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 }
 
-export function deactivate(): void { }
+export function deactivate(): void {}
