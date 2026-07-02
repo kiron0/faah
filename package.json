@@ -15,7 +15,7 @@
     "url": "https://github.com/kiron0/faah/issues"
   },
   "engines": {
-    "vscode": "^1.105.0"
+    "vscode": "^1.125.0"
   },
   "categories": [
     "Other"
@@ -272,19 +272,19 @@
     "test:integration": "vitest run tests/integration",
     "test:smoke": "vitest run tests/smoke",
     "vscode:prepublish": "npm run compile",
-    "package": "vsce package --no-yarn",
+    "package": "npx @vscode/vsce package --no-yarn",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
   },
   "dependencies": {
     "play-sound": "^1.1.6"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
+    "@types/node": "^26.1.0",
     "@types/play-sound": "^1.1.2",
-    "@types/vscode": "1.105.0",
-    "@vscode/vsce": "^3.9.1",
-    "prettier": "^3.8.3",
+    "@types/vscode": "1.125.0",
+    "@vscode/vsce": "^3.9.2",
+    "prettier": "^3.9.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.9"
   }
 }
