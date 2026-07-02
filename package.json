@@ -15,7 +15,7 @@
     "url": "https://github.com/kiron0/faah/issues"
   },
   "engines": {
-    "vscode": "^1.125.0"
+    "vscode": "^1.105.0"
   },
   "categories": [
     "Other"
@@ -262,7 +262,7 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "build": "npm run compile",
+    "build": "npm run package",
     "lint": "tsc --noEmit -p ./",
     "watch": "tsc -w -p ./",
     "list": "vsce ls --tree",
@@ -281,7 +281,7 @@
   "devDependencies": {
     "@types/node": "^26.1.0",
     "@types/play-sound": "^1.1.2",
-    "@types/vscode": "1.125.0",
+    "@types/vscode": "1.105.0",
     "@vscode/vsce": "^3.9.2",
     "prettier": "^3.9.4",
     "typescript": "^6.0.3",
