@@ -96,8 +96,8 @@ function renderSettingsWebview(
       --line: rgba(56, 56, 63, 0.6);
       --text: #f3f4f6;
       --muted: #9ca3af;
-      --accent: #16c8a8;      /* Faah Teal */
-      --accent-2: #e52b2d;    /* Faah Crimson */
+      --accent: #e52b2d;      /* Faah Crimson */
+      --accent-2: #ff5a5a;    /* Hover Crimson */
       --danger: #ef4444;
       --input-bg: rgba(18, 18, 22, 0.85);
       --input-border: rgba(56, 56, 63, 0.8);
@@ -109,8 +109,8 @@ function renderSettingsWebview(
       margin: 0;
       color: var(--text);
       background:
-        radial-gradient(70rem 35rem at -10% -20%, rgba(229, 43, 45, 0.14), transparent 60%),
-        radial-gradient(70rem 35rem at 110% 120%, rgba(22, 200, 168, 0.12), transparent 60%),
+        radial-gradient(70rem 35rem at -10% -20%, rgba(229, 43, 45, 0.15), transparent 60%),
+        radial-gradient(70rem 35rem at 110% 120%, rgba(229, 43, 45, 0.08), transparent 60%),
         linear-gradient(130deg, var(--bg-1), var(--bg-2));
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       min-height: 100vh;
@@ -136,7 +136,7 @@ function renderSettingsWebview(
       gap: 16px;
       padding: 18px 20px;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(100deg, rgba(229, 43, 45, 0.08), rgba(22, 200, 168, 0.04));
+      background: linear-gradient(100deg, rgba(229, 43, 45, 0.08), rgba(229, 43, 45, 0.03));
     }
 
     .brand {
@@ -345,8 +345,8 @@ function renderSettingsWebview(
     }
 
     .switch.on {
-      background: rgba(22, 200, 168, 0.4);
-      border-color: rgba(22, 200, 168, 0.7);
+      background: rgba(229, 43, 45, 0.4);
+      border-color: rgba(229, 43, 45, 0.7);
     }
 
     .switch.on span {
@@ -392,8 +392,8 @@ function renderSettingsWebview(
       text-align: center;
       padding: 5px 8px;
       border-radius: 6px;
-      background: rgba(22, 200, 168, 0.15);
-      border: 1px solid rgba(22, 200, 168, 0.35);
+      background: rgba(229, 43, 45, 0.15);
+      border: 1px solid rgba(229, 43, 45, 0.35);
       font-weight: 600;
       font-size: 0.82rem;
     }
@@ -453,7 +453,7 @@ function renderSettingsWebview(
 
     .radio-option input[type="radio"]:checked {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(22, 200, 168, 0.18);
+      box-shadow: 0 0 0 3px rgba(229, 43, 45, 0.18);
     }
 
     .radio-option input[type="radio"]:checked::before {
@@ -472,7 +472,7 @@ function renderSettingsWebview(
 
     .radio-option input[type="checkbox"]:checked {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(22, 200, 168, 0.18);
+      box-shadow: 0 0 0 3px rgba(229, 43, 45, 0.18);
     }
 
     .radio-option input[type="checkbox"]:checked::before {
@@ -581,6 +581,18 @@ function renderSettingsWebview(
     .credit-footer strong {
       color: #d8e7ff;
       font-weight: 500;
+    }
+
+    .credit-footer a {
+      color: var(--accent-2);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 120ms ease;
+    }
+
+    .credit-footer a:hover {
+      color: var(--accent);
+      text-decoration: underline;
     }
 
     button:not(.switch):not(.tab-btn) {
@@ -964,8 +976,8 @@ function renderSettingsWebview(
     </section>
 
     <section class="credit-footer" aria-label="Credits">
-      <div><strong>Developed by:</strong> Toufiq Hasan Kiron</div>
-      <div><strong>Concept by:</strong> Md Shoaib Taimur</div>
+      <div><strong>Developed by:</strong> <a href="https://kiron.dev" target="_blank">Toufiq Hasan Kiron</a></div>
+      <div><strong>Concept by:</strong> <a href="https://taimur.dev" target="_blank">Md Shoaib Taimur</a></div>
     </section>
   </div>
 
