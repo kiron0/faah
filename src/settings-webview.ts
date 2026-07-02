@@ -91,14 +91,16 @@ function renderSettingsWebview(
     :root {
       --bg-1: #07111e;
       --bg-2: #0f1f2f;
-      --panel: rgba(10, 20, 34, 0.88);
-      --card: rgba(15, 31, 47, 0.9);
-      --line: rgba(255, 255, 255, 0.12);
+      --panel: rgba(10, 20, 34, 0.9);
+      --card: rgba(15, 31, 47, 0.92);
+      --line: rgba(255, 255, 255, 0.1);
       --text: #e6f0ff;
-      --muted: #9fb3c8;
+      --muted: #8ea2b8;
       --accent: #16c8a8;
       --accent-2: #5bb6ff;
       --danger: #ff6f6f;
+      --input-bg: rgba(5, 13, 24, 0.7);
+      --input-border: rgba(255, 255, 255, 0.15);
     }
 
     * { box-sizing: border-box; }
@@ -107,12 +109,12 @@ function renderSettingsWebview(
       margin: 0;
       color: var(--text);
       background:
-        radial-gradient(70rem 35rem at -10% -20%, rgba(91, 182, 255, 0.25), transparent 60%),
-        radial-gradient(70rem 35rem at 110% 120%, rgba(22, 200, 168, 0.22), transparent 60%),
+        radial-gradient(70rem 35rem at -10% -20%, rgba(91, 182, 255, 0.2), transparent 60%),
+        radial-gradient(70rem 35rem at 110% 120%, rgba(22, 200, 168, 0.18), transparent 60%),
         linear-gradient(130deg, var(--bg-1), var(--bg-2));
-      font-family: "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       min-height: 100vh;
-      padding: 24px 12px 20px;
+      padding: 20px 12px;
     }
 
     .wrap {
@@ -121,9 +123,9 @@ function renderSettingsWebview(
       margin: 0 auto;
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 20px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      border-radius: 12px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
       overflow: hidden;
     }
 
@@ -131,76 +133,79 @@ function renderSettingsWebview(
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 18px;
-      padding: 20px 24px;
+      gap: 16px;
+      padding: 18px 20px;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(100deg, rgba(91, 182, 255, 0.14), rgba(22, 200, 168, 0.1));
+      background: linear-gradient(100deg, rgba(91, 182, 255, 0.08), rgba(22, 200, 168, 0.05));
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
     }
 
     .brand img {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
     }
 
     h1 {
       margin: 0;
-      font-size: 1.25rem;
-      letter-spacing: 0.2px;
-      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: 0.1px;
+      font-weight: 600;
     }
 
     .hero p {
-      margin: 3px 0 0;
+      margin: 2px 0 0;
       color: var(--muted);
-      font-size: 0.92rem;
+      font-size: 0.85rem;
     }
 
     .pill {
       display: inline-flex;
       align-items: center;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(91, 182, 255, 0.35);
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(91, 182, 255, 0.25);
       color: #d9edff;
-      font-size: 0.8rem;
-      background: rgba(91, 182, 255, 0.15);
+      font-size: 0.78rem;
+      background: rgba(91, 182, 255, 0.1);
       white-space: normal;
       max-width: min(60ch, 100%);
-      line-height: 1.3;
+      line-height: 1.35;
     }
 
     .pill.error {
-      border-color: rgba(255, 111, 111, 0.5);
+      border-color: rgba(255, 111, 111, 0.35);
       color: #ffd8d8;
-      background: rgba(255, 111, 111, 0.16);
+      background: rgba(255, 111, 111, 0.1);
     }
 
     .pill.warn {
-      border-color: rgba(255, 208, 117, 0.46);
+      border-color: rgba(255, 208, 117, 0.35);
       color: #ffefc9;
-      background: rgba(255, 208, 117, 0.16);
+      background: rgba(255, 208, 117, 0.1);
     }
 
     .grid {
-      padding: 22px;
+      padding: 16px;
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
+      gap: 16px;
     }
 
     .card {
       border: 1px solid var(--line);
-      border-radius: 14px;
+      border-radius: 10px;
       background: var(--card);
-      padding: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
     .card.full {
@@ -208,155 +213,275 @@ function renderSettingsWebview(
     }
 
     .card.notice {
-      background: linear-gradient(120deg, rgba(255, 208, 117, 0.12), rgba(91, 182, 255, 0.09));
-      border-color: rgba(255, 208, 117, 0.24);
+      background: linear-gradient(120deg, rgba(255, 208, 117, 0.08), rgba(91, 182, 255, 0.05));
+      border-color: rgba(255, 208, 117, 0.18);
     }
 
     label {
       display: block;
-      margin-bottom: 8px;
-      font-weight: 650;
-      font-size: 0.92rem;
+      font-weight: 600;
+      font-size: 0.88rem;
+      color: #ffffff;
+      margin: 0;
     }
 
     .hint {
-      margin-top: 6px;
       color: var(--muted);
-      font-size: 0.82rem;
-      line-height: 1.3;
+      font-size: 0.8rem;
+      line-height: 1.35;
+      margin: 0;
     }
 
-    input[type="text"], input[type="number"], select, textarea {
+    input[type="text"],
+    input[type="number"],
+    input[type="time"],
+    select,
+    textarea {
       width: 100%;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(5, 13, 24, 0.82);
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
       color: var(--text);
-      border-radius: 10px;
-      padding: 10px 11px;
+      border-radius: 6px;
+      padding: 7px 10px;
       outline: none;
       font: inherit;
-      transition: border-color 150ms ease, box-shadow 150ms ease;
+      font-size: 0.88rem;
+      transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+    }
+
+    input[type="text"]:hover,
+    input[type="number"]:hover,
+    input[type="time"]:hover,
+    select:hover,
+    textarea:hover {
+      border-color: rgba(255, 255, 255, 0.28);
+      background: rgba(5, 13, 24, 0.8);
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent-2);
+      background: rgba(5, 13, 24, 0.85);
+      box-shadow: 0 0 0 3px rgba(91, 182, 255, 0.18);
+    }
+
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238ea2b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 14px;
+      padding-right: 32px;
     }
 
     textarea {
-      min-height: 140px;
-      max-height: 240px;
+      min-height: 100px;
+      max-height: 200px;
       resize: vertical;
       overflow-y: auto;
-      line-height: 1.35;
+      line-height: 1.4;
     }
 
     .pattern-list {
       margin: 0;
-      padding: 10px 14px 10px 28px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(4, 10, 20, 0.8);
-      color: rgba(230, 240, 255, 0.88);
-      border-radius: 10px;
-      max-height: 240px;
+      padding: 8px 12px 8px 24px;
+      border: 1px solid var(--input-border);
+      background: rgba(4, 10, 20, 0.7);
+      color: rgba(230, 240, 255, 0.85);
+      border-radius: 6px;
+      max-height: 180px;
       overflow-y: auto;
-      line-height: 1.35;
+      line-height: 1.4;
     }
 
     .pattern-list li + li {
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     .pattern-list code {
       color: inherit;
       background: transparent;
-      font-size: 0.82rem;
-      font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.8rem;
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
       word-break: break-word;
-    }
-
-    input:focus, select:focus, textarea:focus {
-      border-color: var(--accent-2);
-      box-shadow: 0 0 0 3px rgba(91, 182, 255, 0.22);
     }
 
     .row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 16px;
+    }
+
+    .row > div {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .switch {
       position: relative;
-      width: 56px;
-      height: 30px;
+      width: 44px;
+      height: 24px;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.08);
       cursor: pointer;
-      transition: background 180ms ease, border-color 180ms ease;
+      transition: background 180ms cubic-bezier(0.4, 0, 0.2, 1), border-color 180ms ease;
+      flex-shrink: 0;
+      padding: 0;
     }
 
     .switch span {
       position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 22px;
-      height: 22px;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
-      background: #fff;
-      transition: transform 180ms ease;
+      background: #ffffff;
+      transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
 
     .switch.on {
-      background: rgba(22, 200, 168, 0.32);
-      border-color: rgba(22, 200, 168, 0.65);
+      background: rgba(22, 200, 168, 0.4);
+      border-color: rgba(22, 200, 168, 0.7);
     }
 
     .switch.on span {
-      transform: translateX(26px);
+      transform: translateX(20px);
     }
 
     .volume-row {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      width: 100%;
     }
 
     input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
       width: 100%;
-      accent-color: var(--accent);
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+      margin: 8px 0;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      transition: transform 100ms ease, background-color 100ms ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: var(--accent-2);
+      transform: scale(1.15);
     }
 
     .value-badge {
-      min-width: 62px;
+      min-width: 60px;
       text-align: center;
-      padding: 7px 8px;
-      border-radius: 9px;
-      background: rgba(22, 200, 168, 0.2);
-      border: 1px solid rgba(22, 200, 168, 0.4);
-      font-weight: 700;
-      font-size: 0.85rem;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: rgba(22, 200, 168, 0.15);
+      border: 1px solid rgba(22, 200, 168, 0.35);
+      font-weight: 600;
+      font-size: 0.82rem;
     }
 
     .radio-group {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 8px;
     }
 
     .radio-option {
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 8px;
       margin: 0;
       font-weight: 500;
-      font-size: 0.9rem;
+      font-size: 0.86rem;
       cursor: pointer;
+      color: rgba(230, 240, 255, 0.9);
+      user-select: none;
+    }
+
+    .radio-option input[type="radio"],
+    .radio-option input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      border: 1.5px solid rgba(255, 255, 255, 0.25);
+      background: rgba(5, 13, 24, 0.6);
+      outline: none;
+      transition: all 150ms ease;
+      cursor: pointer;
+      display: inline-grid;
+      place-content: center;
+      flex-shrink: 0;
     }
 
     .radio-option input[type="radio"] {
-      margin: 0;
-      accent-color: var(--accent);
+      border-radius: 50%;
     }
 
-    .mode-preview {
-      margin-top: 12px;
+    .radio-option input[type="checkbox"] {
+      border-radius: 3px;
+    }
+
+    .radio-option input[type="radio"]::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      transform: scale(0);
+      transition: transform 150ms ease;
+    }
+
+    .radio-option input[type="radio"]:checked {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(22, 200, 168, 0.18);
+    }
+
+    .radio-option input[type="radio"]:checked::before {
+      transform: scale(1);
+    }
+
+    .radio-option input[type="checkbox"]::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent);
+      transform: scale(0);
+      transition: transform 150ms ease;
+      clip-path: polygon(14% 44%, 0 58%, 35% 93%, 100% 28%, 86% 14%, 35% 65%);
+    }
+
+    .radio-option input[type="checkbox"]:checked {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(22, 200, 168, 0.18);
+    }
+
+    .radio-option input[type="checkbox"]:checked::before {
+      transform: scale(1);
+    }
+
+    .radio-option:hover input[type="radio"],
+    .radio-option:hover input[type="checkbox"] {
+      border-color: var(--accent-2);
     }
 
     .time-range {
@@ -364,18 +489,17 @@ function renderSettingsWebview(
       grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       gap: 10px;
       align-items: center;
-      margin-top: 10px;
     }
 
     .time-separator {
       color: var(--muted);
-      font-size: 0.85rem;
-      font-weight: 600;
+      font-size: 0.8rem;
+      font-weight: 500;
     }
 
     .validation-summary {
       margin: 0;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: var(--muted);
     }
 
@@ -388,23 +512,23 @@ function renderSettingsWebview(
     }
 
     .validation-list {
-      margin: 10px 0 0;
-      padding-left: 18px;
+      margin: 0;
+      padding-left: 16px;
       color: #ffd6d6;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       line-height: 1.35;
-      max-height: 150px;
+      max-height: 120px;
       overflow-y: auto;
     }
 
     .validation-list li + li {
-      margin-top: 5px;
+      margin-top: 4px;
     }
 
     .validation-list code {
       color: #ffd6d6;
       background: transparent;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
     }
 
     .hidden {
@@ -413,13 +537,14 @@ function renderSettingsWebview(
 
     .path-display {
       width: 100%;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(5, 13, 24, 0.82);
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
       color: var(--text);
-      border-radius: 10px;
-      padding: 10px 11px;
+      border-radius: 6px;
+      padding: 7px 10px;
       font: inherit;
-      min-height: 42px;
+      font-size: 0.85rem;
+      min-height: 32px;
       display: flex;
       align-items: center;
       line-height: 1.3;
@@ -430,76 +555,131 @@ function renderSettingsWebview(
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
-      margin-top: 10px;
     }
 
     .actions {
       border-top: 1px solid var(--line);
-      padding: 14px 22px 18px;
+      padding: 12px 16px;
       display: flex;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
       align-items: center;
       justify-content: flex-end;
+      background: rgba(10, 20, 34, 0.4);
     }
 
     .credit-footer {
       border-top: 1px solid var(--line);
-      padding: 12px 22px 14px;
+      padding: 12px 16px;
       display: flex;
       flex-wrap: wrap;
-      gap: 10px 18px;
+      gap: 8px 16px;
       color: var(--muted);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
     }
 
     .credit-footer strong {
       color: #d8e7ff;
-      font-weight: 600;
+      font-weight: 500;
     }
 
-    button {
+    button:not(.switch):not(.tab-btn) {
       border: 1px solid transparent;
-      border-radius: 10px;
+      border-radius: 6px;
       color: #03151f;
       background: linear-gradient(120deg, var(--accent), #44e2c5);
-      padding: 10px 14px;
+      padding: 6px 12px;
       font: inherit;
-      font-weight: 700;
+      font-size: 0.84rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: transform 130ms ease, filter 130ms ease;
+      transition: background 150ms ease, border-color 150ms ease, transform 100ms ease, box-shadow 150ms ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    button:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.04);
+    button:not(.switch):not(.tab-btn):hover {
+      filter: brightness(1.06);
+      box-shadow: 0 4px 12px rgba(22, 200, 168, 0.2);
     }
 
-    button:disabled {
+    button:not(.switch):not(.tab-btn):active {
+      transform: scale(0.98);
+    }
+
+    button:not(.switch):not(.tab-btn):disabled {
       cursor: not-allowed;
-      opacity: 0.6;
+      opacity: 0.45;
       transform: none;
       filter: none;
+      box-shadow: none;
     }
 
-    button.secondary {
+    button:not(.switch):not(.tab-btn).secondary {
       color: var(--text);
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
     }
 
-    button.ghost {
+    button:not(.switch):not(.tab-btn).secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.25);
+      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.04);
+    }
+
+    button:not(.switch):not(.tab-btn).ghost {
       color: #ffd6d6;
+      background: rgba(255, 111, 111, 0.06);
+      border: 1px solid rgba(255, 111, 111, 0.2);
+    }
+
+    button:not(.switch):not(.tab-btn).ghost:hover {
       background: rgba(255, 111, 111, 0.12);
-      border-color: rgba(255, 111, 111, 0.36);
+      border-color: rgba(255, 111, 111, 0.3);
+      box-shadow: 0 4px 12px rgba(255, 111, 111, 0.05);
+    }
+
+    .tabs-nav {
+      display: flex;
+      border-bottom: 1px solid var(--line);
+      background: rgba(10, 20, 34, 0.35);
+      padding: 0 16px;
+      gap: 4px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 0.84rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 120ms ease;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
     }
 
     .status {
       margin-right: auto;
-      font-size: 0.88rem;
+      font-size: 0.82rem;
       color: var(--muted);
       opacity: 0;
-      transform: translateY(4px);
+      transform: translateY(2px);
       transition: opacity 160ms ease, transform 160ms ease;
     }
 
@@ -519,10 +699,29 @@ function renderSettingsWebview(
     @media (max-width: 860px) {
       .grid {
         grid-template-columns: 1fr;
+        padding: 12px;
+        gap: 12px;
       }
       .hero {
         flex-direction: column;
         align-items: flex-start;
+        gap: 8px;
+        padding: 14px 16px;
+      }
+      .tabs-nav {
+        padding: 0 8px;
+      }
+      .tab-btn {
+        padding: 10px 12px;
+        font-size: 0.82rem;
+      }
+      .wrap {
+        width: 100%;
+        border-radius: 0;
+        border: none;
+      }
+      body {
+        padding: 0;
       }
     }
   </style>
@@ -539,8 +738,15 @@ function renderSettingsWebview(
       </div>
       <div id="pillStatus" class="pill" role="status" aria-live="polite">Settings auto-save instantly to keep everything in sync.</div>
     </section>
+    <nav class="tabs-nav" role="tablist" aria-label="Settings Categories">
+      <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true" aria-controls="tab-overview" type="button">Overview</button>
+      <button class="tab-btn" data-tab="detection" role="tab" aria-selected="false" aria-controls="tab-detection" type="button">Detection</button>
+      <button class="tab-btn" data-tab="sound" role="tab" aria-selected="false" aria-controls="tab-sound" type="button">Sound & Quiet</button>
+      <button class="tab-btn" data-tab="patterns" role="tab" aria-selected="false" aria-controls="tab-patterns" type="button">Patterns</button>
+      <button class="tab-btn" data-tab="backup" role="tab" aria-selected="false" aria-controls="tab-backup" type="button">Backup & Tools</button>
+    </nav>
 
-    <section class="grid">
+    <section id="tab-overview" class="grid tab-content" role="tabpanel" aria-label="Overview">
       <article class="card full notice">
         <label>Host Compatibility</label>
         <div class="hint">${terminalStatusMessage}</div>
@@ -559,6 +765,44 @@ function renderSettingsWebview(
         </div>
       </article>
 
+      <article class="card">
+        <label>Visual Alerts</label>
+        <div class="row">
+          <div>
+            <div>Popup notifications</div>
+            <div class="hint">Show a visual warning when Faah detects an issue.</div>
+          </div>
+          <button id="visualAlertsSwitch" class="switch" type="button" aria-label="Toggle visual alerts"><span></span></button>
+        </div>
+      </article>
+
+      <article class="card">
+        <label for="saveTarget">Save Scope</label>
+        <select id="saveTarget" aria-label="Save scope">
+          <option value="global"${selectedSaveTarget === "global" ? " selected" : ""}>User (Global)</option>
+          <option value="workspace"${selectedSaveTarget === "workspace" ? " selected" : ""}${hasWorkspace ? "" : " disabled"}>Workspace</option>
+        </select>
+        <div class="hint">
+          ${
+            hasWorkspace
+              ? "Choose where auto-saved settings should be stored."
+              : "No workspace open. Settings will be saved to user settings."
+          }
+        </div>
+      </article>
+
+      <article class="card full">
+        <label>Quick Presets</label>
+        <div class="hint">Apply a ready-made profile without changing your custom sound or regex lists.</div>
+        <div class="button-row">
+          <button class="secondary" id="presetBalancedBtn" type="button">Balanced</button>
+          <button class="secondary" id="presetQuietBtn" type="button">Quiet</button>
+          <button class="secondary" id="presetAggressiveBtn" type="button">Aggressive</button>
+        </div>
+      </article>
+    </section>
+
+    <section id="tab-detection" class="grid tab-content hidden" role="tabpanel" aria-label="Detection">
       <article class="card full">
         <label>Detection Sources</label>
         <div class="row">
@@ -616,8 +860,10 @@ function renderSettingsWebview(
         </div>
         <div class="hint">Delay between diagnostics-triggered alerts (minimum 500ms).</div>
       </article>
+    </section>
 
-      <article class="card">
+    <section id="tab-sound" class="grid tab-content hidden" role="tabpanel" aria-label="Sound & Quiet">
+      <article class="card full">
         <label>Volume</label>
         <div class="volume-row">
           <input id="volumePercent" type="range" min="0" max="100" step="5" />
@@ -626,33 +872,7 @@ function renderSettingsWebview(
         <div class="hint">0% is mute and 100% is max.</div>
       </article>
 
-      <article class="card">
-        <label>Visual Alerts</label>
-        <div class="row">
-          <div>
-            <div>Popup notifications</div>
-            <div class="hint">Show a visual warning when Faah detects an issue.</div>
-          </div>
-          <button id="visualAlertsSwitch" class="switch" type="button" aria-label="Toggle visual alerts"><span></span></button>
-        </div>
-      </article>
-
-      <article class="card">
-        <label for="saveTarget">Save Scope</label>
-        <select id="saveTarget" aria-label="Save scope">
-          <option value="global"${selectedSaveTarget === "global" ? " selected" : ""}>User (Global)</option>
-          <option value="workspace"${selectedSaveTarget === "workspace" ? " selected" : ""}${hasWorkspace ? "" : " disabled"}>Workspace</option>
-        </select>
-        <div class="hint">
-          ${
-            hasWorkspace
-              ? "Choose where auto-saved settings should be stored."
-              : "No workspace open. Settings will be saved to user settings."
-          }
-        </div>
-      </article>
-
-      <article class="card">
+      <article class="card full">
         <label>Quiet Hours</label>
         <div class="row">
           <div>
@@ -678,7 +898,9 @@ function renderSettingsWebview(
           <button class="secondary" id="useDefaultSoundBtn" type="button">Use Default (faah)</button>
         </div>
       </article>
+    </section>
 
+    <section id="tab-patterns" class="grid tab-content hidden" role="tabpanel" aria-label="Patterns">
       <article class="card full">
         <label>Pattern Mode</label>
         <div class="radio-group" role="radiogroup" aria-label="Pattern mode">
@@ -722,23 +944,15 @@ function renderSettingsWebview(
         <ul id="invalidPatternList" class="validation-list hidden" aria-label="Invalid custom patterns"></ul>
         <ul id="invalidExcludePatternList" class="validation-list hidden" aria-label="Invalid exclude patterns"></ul>
       </article>
+    </section>
 
-      <article class="card">
+    <section id="tab-backup" class="grid tab-content hidden" role="tabpanel" aria-label="Backup & Tools">
+      <article class="card full">
         <label>Settings Backup</label>
         <div class="hint">Export your current Faah setup to JSON or import it on another machine.</div>
         <div class="button-row">
           <button class="secondary" id="exportSettingsBtn" type="button">Export Settings</button>
           <button class="secondary" id="importSettingsBtn" type="button">Import Settings</button>
-        </div>
-      </article>
-
-      <article class="card">
-        <label>Quick Presets</label>
-        <div class="hint">Apply a ready-made profile without changing your custom sound or regex lists.</div>
-        <div class="button-row">
-          <button class="secondary" id="presetBalancedBtn" type="button">Balanced</button>
-          <button class="secondary" id="presetQuietBtn" type="button">Quiet</button>
-          <button class="secondary" id="presetAggressiveBtn" type="button">Aggressive</button>
         </div>
       </article>
     </section>
@@ -1394,6 +1608,29 @@ function renderSettingsWebview(
     renderExcludePresetOptions();
     applySettings(initial);
     latestSavedSignature = createSettingsSignature(collectSettings());
+
+    // Tab switching logic
+    const tabButtons = document.querySelectorAll(".tab-btn");
+    const tabContents = document.querySelectorAll(".tab-content");
+
+    tabButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetTab = btn.dataset.tab;
+        
+        tabButtons.forEach((b) => {
+          b.classList.remove("active");
+          b.setAttribute("aria-selected", "false");
+        });
+        tabContents.forEach((tc) => tc.classList.add("hidden"));
+
+        btn.classList.add("active");
+        btn.setAttribute("aria-selected", "true");
+        const targetEl = document.getElementById("tab-" + targetTab);
+        if (targetEl) {
+          targetEl.classList.remove("hidden");
+        }
+      });
+    });
   </script>
 </body>
 </html>`;
