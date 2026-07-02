@@ -89,18 +89,18 @@ function renderSettingsWebview(
   <link rel="icon" type="image/png" href="${iconUri}" />
   <style>
     :root {
-      --bg-1: #07111e;
-      --bg-2: #0f1f2f;
-      --panel: rgba(10, 20, 34, 0.9);
-      --card: rgba(15, 31, 47, 0.92);
-      --line: rgba(255, 255, 255, 0.1);
-      --text: #e6f0ff;
-      --muted: #8ea2b8;
-      --accent: #16c8a8;
-      --accent-2: #5bb6ff;
-      --danger: #ff6f6f;
-      --input-bg: rgba(5, 13, 24, 0.7);
-      --input-border: rgba(255, 255, 255, 0.15);
+      --bg-1: #121216;
+      --bg-2: #1a1a1f;
+      --panel: rgba(26, 26, 31, 0.93);
+      --card: rgba(34, 34, 39, 0.94);
+      --line: rgba(56, 56, 63, 0.6);
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #16c8a8;      /* Faah Teal */
+      --accent-2: #e52b2d;    /* Faah Crimson */
+      --danger: #ef4444;
+      --input-bg: rgba(18, 18, 22, 0.85);
+      --input-border: rgba(56, 56, 63, 0.8);
     }
 
     * { box-sizing: border-box; }
@@ -109,8 +109,8 @@ function renderSettingsWebview(
       margin: 0;
       color: var(--text);
       background:
-        radial-gradient(70rem 35rem at -10% -20%, rgba(91, 182, 255, 0.2), transparent 60%),
-        radial-gradient(70rem 35rem at 110% 120%, rgba(22, 200, 168, 0.18), transparent 60%),
+        radial-gradient(70rem 35rem at -10% -20%, rgba(229, 43, 45, 0.14), transparent 60%),
+        radial-gradient(70rem 35rem at 110% 120%, rgba(22, 200, 168, 0.12), transparent 60%),
         linear-gradient(130deg, var(--bg-1), var(--bg-2));
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       min-height: 100vh;
@@ -125,7 +125,7 @@ function renderSettingsWebview(
       border: 1px solid var(--line);
       border-radius: 12px;
       backdrop-filter: blur(16px);
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(229, 43, 45, 0.05);
       overflow: hidden;
     }
 
@@ -136,7 +136,7 @@ function renderSettingsWebview(
       gap: 16px;
       padding: 18px 20px;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(100deg, rgba(91, 182, 255, 0.08), rgba(22, 200, 168, 0.05));
+      background: linear-gradient(100deg, rgba(229, 43, 45, 0.08), rgba(22, 200, 168, 0.04));
     }
 
     .brand {
@@ -170,19 +170,19 @@ function renderSettingsWebview(
       align-items: center;
       padding: 6px 12px;
       border-radius: 6px;
-      border: 1px solid rgba(91, 182, 255, 0.25);
-      color: #d9edff;
+      border: 1px solid rgba(229, 43, 45, 0.25);
+      color: #ffd8d8;
       font-size: 0.78rem;
-      background: rgba(91, 182, 255, 0.1);
+      background: rgba(229, 43, 45, 0.08);
       white-space: normal;
       max-width: min(60ch, 100%);
       line-height: 1.35;
     }
 
     .pill.error {
-      border-color: rgba(255, 111, 111, 0.35);
+      border-color: rgba(239, 68, 68, 0.35);
       color: #ffd8d8;
-      background: rgba(255, 111, 111, 0.1);
+      background: rgba(239, 68, 68, 0.1);
     }
 
     .pill.warn {
@@ -586,8 +586,8 @@ function renderSettingsWebview(
     button:not(.switch):not(.tab-btn) {
       border: 1px solid transparent;
       border-radius: 6px;
-      color: #03151f;
-      background: linear-gradient(120deg, var(--accent), #44e2c5);
+      color: #ffffff;
+      background: linear-gradient(120deg, var(--accent-2), #f85b5d);
       padding: 6px 12px;
       font: inherit;
       font-size: 0.84rem;
@@ -600,8 +600,8 @@ function renderSettingsWebview(
     }
 
     button:not(.switch):not(.tab-btn):hover {
-      filter: brightness(1.06);
-      box-shadow: 0 4px 12px rgba(22, 200, 168, 0.2);
+      filter: brightness(1.08);
+      box-shadow: 0 4px 12px rgba(229, 43, 45, 0.25);
     }
 
     button:not(.switch):not(.tab-btn):active {
@@ -630,20 +630,20 @@ function renderSettingsWebview(
 
     button:not(.switch):not(.tab-btn).ghost {
       color: #ffd6d6;
-      background: rgba(255, 111, 111, 0.06);
-      border: 1px solid rgba(255, 111, 111, 0.2);
+      background: rgba(229, 43, 45, 0.1);
+      border: 1px solid rgba(229, 43, 45, 0.35);
     }
 
     button:not(.switch):not(.tab-btn).ghost:hover {
-      background: rgba(255, 111, 111, 0.12);
-      border-color: rgba(255, 111, 111, 0.3);
-      box-shadow: 0 4px 12px rgba(255, 111, 111, 0.05);
+      background: rgba(229, 43, 45, 0.18);
+      border-color: rgba(229, 43, 45, 0.45);
+      box-shadow: 0 4px 12px rgba(229, 43, 45, 0.08);
     }
 
     .tabs-nav {
       display: flex;
       border-bottom: 1px solid var(--line);
-      background: rgba(10, 20, 34, 0.35);
+      background: rgba(18, 18, 22, 0.5);
       padding: 0 16px;
       gap: 4px;
       overflow-x: auto;
@@ -669,8 +669,8 @@ function renderSettingsWebview(
     }
 
     .tab-btn.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
+      color: var(--accent-2);
+      border-bottom-color: var(--accent-2);
       font-weight: 600;
     }
 
@@ -965,7 +965,7 @@ function renderSettingsWebview(
 
     <section class="credit-footer" aria-label="Credits">
       <div><strong>Developed by:</strong> Toufiq Hasan Kiron</div>
-      <div><strong>Concept:</strong> Md Shoaib Taimur</div>
+      <div><strong>Concept by:</strong> Md Shoaib Taimur</div>
     </section>
   </div>
 
