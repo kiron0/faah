@@ -467,16 +467,16 @@ export function activate(context: vscode.ExtensionContext): void {
     async () => {
       type QuickAction = vscode.QuickPickItem & {
         action:
-          | "toggleEnabled"
-          | "toggleTerminal"
-          | "toggleDiagnostics"
-          | "toggleDiagnosticsSeverity"
-          | "snooze"
-          | "clearSnooze"
-          | "setQuietHours"
-          | "openSettings"
-          | "showCompatibility"
-          | "playTestSound";
+        | "toggleEnabled"
+        | "toggleTerminal"
+        | "toggleDiagnostics"
+        | "toggleDiagnosticsSeverity"
+        | "snooze"
+        | "clearSnooze"
+        | "setQuietHours"
+        | "openSettings"
+        | "showCompatibility"
+        | "playTestSound";
       };
 
       const snoozeRemainingMs = getSnoozeRemainingMs();
@@ -495,7 +495,7 @@ export function activate(context: vscode.ExtensionContext): void {
             : effectiveTerminalMonitoringCapability === "outputOnly"
               ? "Output-stream alerts only in this host"
               : "Watch shell output for errors"
-        : "Unavailable in this IDE version";
+        : "Unavailable in this editor version";
       const actions: QuickAction[] = [
         {
           label: settings.enabled ? "Disable Faah" : "Enable Faah",
@@ -535,12 +535,12 @@ export function activate(context: vscode.ExtensionContext): void {
         },
         ...(snoozeRemainingMs > 0
           ? [
-              {
-                label: "Clear Snooze",
-                description: "Resume alerts immediately",
-                action: "clearSnooze" as const,
-              },
-            ]
+            {
+              label: "Clear Snooze",
+              description: "Resume alerts immediately",
+              action: "clearSnooze" as const,
+            },
+          ]
           : []),
         {
           label: settings.quietHoursEnabled
@@ -579,7 +579,7 @@ export function activate(context: vscode.ExtensionContext): void {
         case "toggleTerminal":
           if (!terminalMonitoringSupported) {
             vscode.window.showInformationMessage(
-              "Faah terminal monitoring is unavailable in this IDE version.",
+              "Faah terminal monitoring is unavailable in this editor version.",
             );
             break;
           }
@@ -848,4 +848,4 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 }
 
-export function deactivate(): void {}
+export function deactivate(): void { }

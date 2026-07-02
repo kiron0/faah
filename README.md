@@ -56,7 +56,7 @@ If your errors get dramatic — **Faah gets louder.**
 
 Use Faah from the status bar quick actions or Command Palette.
 
-1. In your IDE, click `Faah Off`, `Faah T`, `Faah E`, or `Faah T+E` in the bottom bar.
+1. In your editor, click `Faah Off`, `Faah T`, `Faah E`, or `Faah T+E` in the bottom bar.
 2. Choose what you want: turn Faah on/off, select terminal/editor/both, switch error mode, snooze alerts, set quiet hours, play test sound, or open full settings.
 3. Settings auto-save instantly in the Control Room; use the schedule presets, compatibility button, or import/export buttons for explicit actions.
 

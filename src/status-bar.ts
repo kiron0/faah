@@ -97,7 +97,7 @@ export function createStatusBarController(): {
       settings.monitorTerminal && !terminalMonitoringSupported
         ? " $(warning)"
         : settings.monitorTerminal &&
-            effectiveTerminalMonitoringCapability !== "full"
+          effectiveTerminalMonitoringCapability !== "full"
           ? " $(info)"
           : "";
     item.text = isSnoozed
@@ -108,20 +108,20 @@ export function createStatusBarController(): {
       `Diagnostics severity: ${describeDiagnosticsSeverity(settings)}`,
       ...(settings.monitorTerminal && !terminalMonitoringSupported
         ? [
-            terminalMonitoringCapability === "none"
-              ? "Terminal monitoring: unavailable in this IDE version."
-              : "Terminal monitoring: current detection mode is unavailable in this host. Change Terminal Detection Mode to a supported signal.",
-          ]
+          terminalMonitoringCapability === "none"
+            ? "Terminal monitoring: unavailable in this editor version."
+            : "Terminal monitoring: current detection mode is unavailable in this host. Change Terminal Detection Mode to a supported signal.",
+        ]
         : settings.monitorTerminal &&
-            effectiveTerminalMonitoringCapability === "exitCodeOnly"
+          effectiveTerminalMonitoringCapability === "exitCodeOnly"
           ? [
-              "Terminal monitoring: partial host support. Exit-code alerts work, but output-stream monitoring is unavailable.",
-            ]
+            "Terminal monitoring: partial host support. Exit-code alerts work, but output-stream monitoring is unavailable.",
+          ]
           : settings.monitorTerminal &&
-              effectiveTerminalMonitoringCapability === "outputOnly"
+            effectiveTerminalMonitoringCapability === "outputOnly"
             ? [
-                "Terminal monitoring: partial host support. Output-stream alerts work, but exit-code monitoring is unavailable.",
-              ]
+              "Terminal monitoring: partial host support. Output-stream alerts work, but exit-code monitoring is unavailable.",
+            ]
             : []),
       `Terminal cooldown: ${settings.terminalCooldownMs}ms`,
       `Diagnostics cooldown: ${settings.diagnosticsCooldownMs}ms`,
