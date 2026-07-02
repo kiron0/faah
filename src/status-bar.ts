@@ -109,7 +109,7 @@ export function createStatusBarController(): {
       ...(settings.monitorTerminal && !terminalMonitoringSupported
         ? [
             terminalMonitoringCapability === "none"
-              ? "Terminal monitoring: unavailable in this Cursor/VS Code version."
+              ? "Terminal monitoring: unavailable in this IDE version."
               : "Terminal monitoring: current detection mode is unavailable in this host. Change Terminal Detection Mode to a supported signal.",
           ]
         : settings.monitorTerminal &&

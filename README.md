@@ -3,7 +3,7 @@
 
 # Faah - Error Alerts
 
-### Your Error Drama Alarm for VS Code
+### Your Error Drama Alarm for IDEs
 
 Never miss errors in your editor. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.
 
@@ -21,7 +21,7 @@ Never miss errors in your editor. Faah plays instant alerts for terminal failure
 
 ## Overview
 
-**Faah** is a lightweight VS Code extension that listens for errors and plays a meme sound when they appear.
+**Faah** is a lightweight IDE extension that listens for errors and plays a meme sound when they appear.
 
 Default sound is `faah`, and you can optionally upload/select a custom sound file.
 
@@ -56,7 +56,7 @@ If your errors get dramatic — **Faah gets louder.**
 
 Use Faah from the status bar quick actions or Command Palette.
 
-1. In VS Code, click `Faah Off`, `Faah T`, `Faah E`, or `Faah T+E` in the bottom bar.
+1. In your IDE, click `Faah Off`, `Faah T`, `Faah E`, or `Faah T+E` in the bottom bar.
 2. Choose what you want: turn Faah on/off, select terminal/editor/both, switch error mode, snooze alerts, set quiet hours, play test sound, or open full settings.
 3. Settings auto-save instantly in the Control Room; use the schedule presets, compatibility button, or import/export buttons for explicit actions.
 

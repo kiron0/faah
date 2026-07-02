@@ -20,7 +20,6 @@ function shouldMonitorTerminalOutput(settings: RuntimeSettings): boolean {
   return settings.terminalDetectionMode !== "exitCode";
 }
 
-
 function looksLikeError(line: string, patterns: readonly RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(line));
 }

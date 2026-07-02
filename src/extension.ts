@@ -5,7 +5,12 @@ import {
   getSnoozeRemainingMs,
   snoozeAlertsForMs,
 } from "./alert-gate";
-import { playAlert, prewarmAudioBackend, resetPrewarmState, resolveSoundPath } from "./audio";
+import {
+  playAlert,
+  prewarmAudioBackend,
+  resetPrewarmState,
+  resolveSoundPath,
+} from "./audio";
 import { commandIds } from "./commands";
 import {
   clearDiagnosticsRetryTimers,
@@ -230,7 +235,7 @@ export function activate(context: vscode.ExtensionContext): void {
   } => {
     const hostName = vscode.env.appName || "This editor";
     const hostVersion = vscode.version;
-    const baseMessage = `${hostName} reports VS Code API ${hostVersion}.`;
+    const baseMessage = `${hostName} reports IDE API ${hostVersion}.`;
     const effectiveTerminalMonitoringCapability =
       getEffectiveTerminalMonitoringState();
 
@@ -490,7 +495,7 @@ export function activate(context: vscode.ExtensionContext): void {
             : effectiveTerminalMonitoringCapability === "outputOnly"
               ? "Output-stream alerts only in this host"
               : "Watch shell output for errors"
-        : "Unavailable in this Cursor/VS Code version";
+        : "Unavailable in this IDE version";
       const actions: QuickAction[] = [
         {
           label: settings.enabled ? "Disable Faah" : "Enable Faah",
@@ -574,7 +579,7 @@ export function activate(context: vscode.ExtensionContext): void {
         case "toggleTerminal":
           if (!terminalMonitoringSupported) {
             vscode.window.showInformationMessage(
-              "Faah terminal monitoring is unavailable in this Cursor/VS Code version.",
+              "Faah terminal monitoring is unavailable in this IDE version.",
             );
             break;
           }

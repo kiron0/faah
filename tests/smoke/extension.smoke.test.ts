@@ -17,8 +17,7 @@ type Harness = {
   };
   getStartHandler: () => ((event: { execution: unknown }) => void) | undefined;
   getEndHandler: () =>
-    | ((event: { execution: unknown; exitCode?: number }) => void)
-    | undefined;
+    ((event: { execution: unknown; exitCode?: number }) => void) | undefined;
   getActiveEditorHandler: () => (() => void) | undefined;
   getTextDocumentHandler: () =>
     | ((event: {
@@ -27,8 +26,7 @@ type Harness = {
       }) => void)
     | undefined;
   getDiagnosticsHandler: () =>
-    | ((event: { uris: unknown[] }) => void)
-    | undefined;
+    ((event: { uris: unknown[] }) => void) | undefined;
   commandHandlers: Map<string, () => void>;
   mocks: {
     monitorExecutionOutput: ReturnType<typeof vi.fn>;
@@ -103,8 +101,7 @@ async function loadExtensionHarness(
 
   let startHandler: ((event: { execution: unknown }) => void) | undefined;
   let endHandler:
-    | ((event: { execution: unknown; exitCode?: number }) => void)
-    | undefined;
+    ((event: { execution: unknown; exitCode?: number }) => void) | undefined;
   let activeEditorHandler: (() => void) | undefined;
   let textDocumentHandler:
     | ((event: {

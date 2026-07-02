@@ -745,7 +745,7 @@ function renderSettingsWebview(
         <img src="${iconUri}" alt="Faah" />
         <div>
           <h1>Faah Control Room</h1>
-          <p>Tune your alert behavior without opening VS Code settings.</p>
+          <p>Tune your alert behavior without opening IDE settings.</p>
         </div>
       </div>
       <div id="pillStatus" class="pill" role="status" aria-live="polite">Settings auto-save instantly to keep everything in sync.</div>
@@ -1367,12 +1367,12 @@ function renderSettingsWebview(
       );
       if (keys.length === 0) return "";
       if (keys.length === 1) {
-        return "VS Code rejected " + keys[0] + ", so Faah kept the value in its own settings store.";
+        return "IDE rejected " + keys[0] + ", so Faah kept the value in its own settings store.";
       }
       const preview = keys.slice(0, 3).join(", ");
       const suffix = keys.length > 3 ? " and " + String(keys.length - 3) + " more" : "";
       return (
-        "VS Code rejected " +
+        "IDE rejected " +
         String(keys.length) +
         " setting(s) (" +
         preview +

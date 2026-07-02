@@ -273,7 +273,8 @@
     "test:smoke": "vitest run tests/smoke",
     "vscode:prepublish": "npm run compile",
     "package": "npx @vscode/vsce package --no-yarn",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "check-all": "bun run format && bun run lint && bun run test && bun run test:unit && bun run test:integration && bun run test:smoke && bun run build"
   },
   "dependencies": {
     "play-sound": "^1.1.6"

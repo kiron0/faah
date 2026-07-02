@@ -23,10 +23,7 @@ export type TerminalShellExecutionApi = {
 };
 
 export type TerminalMonitoringCapability =
-  | "none"
-  | "outputOnly"
-  | "exitCodeOnly"
-  | "full";
+  "none" | "outputOnly" | "exitCodeOnly" | "full";
 
 function isEventLike(value: unknown): value is vscode.Event<unknown> {
   return typeof value === "function";
