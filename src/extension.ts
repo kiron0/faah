@@ -45,6 +45,7 @@ import {
   isExecutionIdentity,
   isTerminalExecutionLike,
 } from "./terminal-shell-integration";
+import { handleZshFixCommand } from "./zsh-fix";
 
 const editorDiagnosticsTypingDebounceMs = 300;
 const statusRefreshIntervalMs = 15_000;
@@ -317,21 +318,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const copyZshFixDisposable = vscode.commands.registerCommand(
     commandIds.copyZshFix,
     async () => {
-      const snippet = [
-        "# VS Code / Cursor Terminal Shell Integration for Zsh",
-        'if [[ "$TERM_PROGRAM" == "vscode" ]] && command -v code >/dev/null 2>&1; then',
-        '  . "$(code --locate-shell-integration-path zsh 2>/dev/null)"',
-        'elif [[ "$TERM_PROGRAM" == "cursor" ]] && command -v cursor >/dev/null 2>&1; then',
-        '  . "$(cursor --locate-shell-integration-path zsh 2>/dev/null)"',
-        "fi",
-      ].join("\\n");
-      const clipboardApi = vscode.env?.clipboard;
-      if (clipboardApi?.writeText) {
-        await clipboardApi.writeText(snippet);
-        void vscode.window.showInformationMessage(
-          "Copied Zsh shell integration fix to clipboard! Add to ~/.zshrc and restart terminal.",
-        );
-      }
+      await handleZshFixCommand();
     },
   );
 

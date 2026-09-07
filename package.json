@@ -3,7 +3,7 @@
   "displayName": "Faah - Error Alerts",
   "description": "Instant drama the second your code breaks. Audio alerts for terminal errors and editor diagnostics.",
   "icon": "images/icon.png",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "repository": {
@@ -81,7 +81,7 @@
       },
       {
         "command": "faah.copyZshFix",
-        "title": "Copy Zsh Integration Fix",
+        "title": "Fix Zsh Terminal Integration",
         "category": "Faah"
       }
     ],

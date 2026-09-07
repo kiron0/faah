@@ -1,4 +1,5 @@
 import * as fs from "fs/promises";
+import * as os from "os";
 import * as vscode from "vscode";
 
 import { commandIds } from "./commands";
@@ -215,6 +216,58 @@ function renderSettingsWebview(
     .card.notice {
       background: linear-gradient(120deg, rgba(255, 208, 117, 0.08), rgba(91, 182, 255, 0.05));
       border-color: rgba(255, 208, 117, 0.18);
+    }
+
+    .snippet-container {
+      position: relative;
+      margin: 8px 0;
+    }
+
+    .snippet-copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 3px 8px !important;
+      font-size: 0.72rem !important;
+      font-weight: 500 !important;
+      background: rgba(255, 255, 255, 0.08) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      border-radius: 4px !important;
+      color: #cbd5e1 !important;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 150ms ease;
+      user-select: none;
+      z-index: 2;
+    }
+
+    .snippet-copy-btn:hover {
+      background: rgba(255, 255, 255, 0.16) !important;
+      border-color: rgba(255, 255, 255, 0.3) !important;
+      color: #ffffff !important;
+    }
+
+    .snippet-copy-btn.copied {
+      background: rgba(34, 197, 94, 0.2) !important;
+      border-color: rgba(34, 197, 94, 0.4) !important;
+      color: #86efac !important;
+    }
+
+    .faq-code {
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      border-radius: 6px;
+      padding: 10px 12px;
+      padding-right: 70px;
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 0.78rem;
+      color: #e6f0ff;
+      line-height: 1.45;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 0;
     }
 
     label {
@@ -756,16 +809,15 @@ function renderSettingsWebview(
       <button class="tab-btn" data-tab="sound" role="tab" aria-selected="false" aria-controls="tab-sound" type="button">Sound & Quiet</button>
       <button class="tab-btn" data-tab="patterns" role="tab" aria-selected="false" aria-controls="tab-patterns" type="button">Patterns</button>
       <button class="tab-btn" data-tab="backup" role="tab" aria-selected="false" aria-controls="tab-backup" type="button">Backup & Tools</button>
+      <button class="tab-btn" data-tab="faq" role="tab" aria-selected="false" aria-controls="tab-faq" type="button">Troubleshooting</button>
     </nav>
 
     <section id="tab-overview" class="grid tab-content" role="tabpanel" aria-label="Overview">
       <article class="card full notice">
         <label>Host Compatibility</label>
         <div class="hint">${terminalStatusMessage}</div>
-        <div class="hint" style="margin-top: 8px;">Using Zsh, Oh My Zsh, or Powerlevel10k? If terminal errors do not trigger alerts, add VS Code shell integration to your <code>~/.zshrc</code>.</div>
-        <div class="button-row">
+        <div class="button-row" style="margin-top: 4px;">
           <button class="secondary" id="compatibilityBtn" type="button">Show Compatibility Status</button>
-          <button class="secondary" id="copyZshBtn" type="button">Copy Zsh Fix</button>
         </div>
       </article>
 
@@ -971,6 +1023,47 @@ function renderSettingsWebview(
       </article>
     </section>
 
+    <section id="tab-faq" class="grid tab-content hidden" role="tabpanel" aria-label="Troubleshooting">
+      <article class="card full">
+        <label>Zsh Shell Integration (Oh My Zsh / Powerlevel10k)</label>
+        <div class="hint">Themes like Oh My Zsh or Powerlevel10k can override prompt hooks, preventing VS Code and Cursor from detecting non-zero command exit codes.</div>
+        <div class="hint">Adding VS Code's shell integration locator to your <code>~/.zshrc</code> restores exit-code alerts instantly.</div>
+        <div class="button-row">
+          <button class="secondary" id="copyZshBtn" type="button">Fix Zsh Integration (~/.zshrc)</button>
+        </div>
+      </article>
+
+      <article class="card full">
+        <label>Terminal Integration Snippet</label>
+        <div class="snippet-container">
+          <button class="snippet-copy-btn" id="copySnippetBtn" type="button" aria-label="Copy snippet to clipboard">
+            <span id="copySnippetIcon">📋</span>
+            <span id="copySnippetText">Copy</span>
+          </button>
+          <div class="faq-code" id="zshSnippetCode"># VS Code / Cursor Terminal Shell Integration for Zsh
+if [[ "$TERM_PROGRAM" == "vscode" ]] && command -v code &gt;/dev/null 2&gt;&amp;1; then
+  . "$(code --locate-shell-integration-path zsh 2&gt;/dev/null)"
+elif [[ "$TERM_PROGRAM" == "cursor" ]] && command -v cursor &gt;/dev/null 2&gt;&amp;1; then
+  . "$(cursor --locate-shell-integration-path zsh 2&gt;/dev/null)"
+fi</div>
+        </div>
+        <div class="hint">After adding, restart terminal with <code>Ctrl+\`</code> / <code>Cmd+\`</code> or run <code>source ~/.zshrc</code>.</div>
+      </article>
+
+      <article class="card">
+        <label>How to Test Alerts</label>
+        <div class="hint">1. Open an integrated terminal.</div>
+        <div class="hint">2. Run a command that fails, like <code>false</code> or <code>exit 1</code>.</div>
+        <div class="hint">3. Faah should play the alarm sound immediately.</div>
+      </article>
+
+      <article class="card">
+        <label>Other Shells & Editors</label>
+        <div class="hint"><strong>Bash & PowerShell:</strong> Built-in integration works automatically in VS Code.</div>
+        <div class="hint"><strong>Cursor & Forks:</strong> The snippet above detects both VS Code and Cursor automatically.</div>
+      </article>
+    </section>
+
     <section class="actions">
       <div id="status" class="status" role="status" aria-live="polite"></div>
       <button class="ghost" id="resetBtn" type="button">Reset Defaults</button>
@@ -994,6 +1087,7 @@ function renderSettingsWebview(
     const ui = {
       compatibilityBtn: document.getElementById("compatibilityBtn"),
       copyZshBtn: document.getElementById("copyZshBtn"),
+      copySnippetBtn: document.getElementById("copySnippetBtn"),
       enabledSwitch: document.getElementById("enabledSwitch"),
       monitorTerminalSwitch: document.getElementById("monitorTerminalSwitch"),
       monitorDiagnosticsSwitch: document.getElementById("monitorDiagnosticsSwitch"),
@@ -1442,6 +1536,33 @@ function renderSettingsWebview(
     ui.copyZshBtn?.addEventListener("click", () => {
       vscode.postMessage({ type: "copyZshFix" });
     });
+    ui.copySnippetBtn?.addEventListener("click", () => {
+      const codeEl = document.getElementById("zshSnippetCode");
+      const textToCopy = codeEl ? codeEl.innerText.trim() : "";
+      if (!textToCopy) return;
+
+      const setCopiedState = () => {
+        ui.copySnippetBtn?.classList.add("copied");
+        const textEl = document.getElementById("copySnippetText");
+        const iconEl = document.getElementById("copySnippetIcon");
+        if (textEl) textEl.textContent = "Copied!";
+        if (iconEl) iconEl.textContent = "✓";
+        flashPill("Zsh snippet copied to clipboard!");
+        setTimeout(() => {
+          ui.copySnippetBtn?.classList.remove("copied");
+          if (textEl) textEl.textContent = "Copy";
+          if (iconEl) iconEl.textContent = "📋";
+        }, 2000);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy).then(setCopiedState).catch(() => {
+          vscode.postMessage({ type: "copyZshFix" });
+        });
+      } else {
+        vscode.postMessage({ type: "copyZshFix" });
+      }
+    });
     ui.monitorTerminalSwitch.addEventListener("click", () => {
       if (!terminalMonitoringSupported) {
         flashStatus("Terminal monitoring is unavailable in this host.", "error");
@@ -1737,8 +1858,13 @@ export function registerSettingsUiCommand(
         if (!message || typeof message.type !== "string") return;
 
         if (message.type === "selectSoundFile") {
+          const defaultUri =
+            typeof vscode.Uri?.file === "function"
+              ? vscode.Uri.file(os.homedir())
+              : undefined;
           const selected = await vscode.window.showOpenDialog({
             title: "Select custom Faah sound",
+            defaultUri,
             canSelectMany: false,
             canSelectFiles: true,
             canSelectFolders: false,

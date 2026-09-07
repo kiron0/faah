@@ -72,7 +72,7 @@ Command Palette commands:
 - `Faah: Clear Snooze`
 - `Faah: Set Quiet Hours`
 - `Faah: Show Compatibility Status` (raises host compatibility info)
-- `Faah: Copy Zsh Integration Fix` (copies shell integration snippet to clipboard)
+- `Faah: Fix Zsh Terminal Integration` (automatically adds shell integration to `~/.zshrc` or copies snippet)
 
 ---
 
@@ -88,7 +88,7 @@ Zsh setups (especially with **Oh My Zsh**, **Powerlevel10k**, or custom themes) 
    In VS Code settings, make sure `terminal.integrated.shellIntegration.enabled` is checked (`true`).
 
 2. **Add Manual Injection to `~/.zshrc`**:
-   Add this snippet to the bottom of `~/.zshrc` (or run `Faah: Copy Zsh Integration Fix` in the Command Palette):
+   Run `Faah: Fix Zsh Terminal Integration` in the Command Palette (or click **Fix Zsh Integration** in Settings UI) to add it automatically or copy the snippet:
 
    ```zsh
    # VS Code / Cursor Terminal Shell Integration for Zsh

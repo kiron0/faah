@@ -819,11 +819,12 @@ describe("extension smoke tests", () => {
     const copyZshCmd = harness.commandHandlers.get("faah.copyZshFix");
     expect(copyZshCmd).toBeTypeOf("function");
 
+    harness.mocks.showInformationMessage.mockResolvedValueOnce("Copy Snippet");
     await copyZshCmd?.();
 
     expect(harness.mocks.writeClipboardText).toHaveBeenCalledWith(
       expect.stringContaining(
-        "# VS Code / Cursor Terminal Shell Integration for Zsh",
+        "# VS Code / Cursor Terminal Shell Integration for Zsh\nif [[",
       ),
     );
     expect(harness.mocks.showInformationMessage).toHaveBeenCalledWith(
