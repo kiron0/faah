@@ -31,6 +31,9 @@ No more cursed error output.
 
 If your errors get dramatic — **Faah gets louder.**
 
+> **Looking for standalone terminal alerts outside VS Code?**  
+> Check out the native CLI package: [`npm install -g faahh`](https://www.npmjs.com/package/faahh)
+
 ---
 
 ## Features
