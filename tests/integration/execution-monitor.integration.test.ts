@@ -228,4 +228,74 @@ describe("execution monitor integration tests", () => {
       ),
     );
   });
+
+  it("skips output stream monitoring when terminalDetectionMode is exitCode", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution(["fatal error occurred\n"]) as any;
+    const settings = createSettings({ terminalDetectionMode: "exitCode" });
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(playAlert).not.toHaveBeenCalled();
+  });
+
+  it("strips ANSI color escape codes before checking alert patterns", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const coloredError =
+      "\u001b[31m\u001b[1merror\u001b[0m: compilation failed\n";
+    const execution = createExecution([coloredError]) as any;
+    const settings = createSettings();
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(playAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles CRLF line breaks correctly", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution([
+      "first line\r\nerror on line 2\r\n",
+    ]) as any;
+    const settings = createSettings();
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(playAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not alert when monitorTerminal is false in tryPlayForExecution", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution([]) as any;
+    const settings = createSettings({ monitorTerminal: false });
+
+    executionMonitor.tryPlayForExecution(execution, settings, "media/faah.wav");
+
+    expect(playAlert).not.toHaveBeenCalled();
+  });
+
+  it("ignores empty chunks and whitespace-only chunks", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution(["", "   ", "\n", "\r\n"]) as any;
+    const settings = createSettings();
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(playAlert).not.toHaveBeenCalled();
+  });
 });

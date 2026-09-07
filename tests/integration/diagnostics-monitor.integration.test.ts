@@ -210,4 +210,103 @@ describe("diagnostics monitor integration tests", () => {
 
     expect(harness.playAlert).not.toHaveBeenCalled();
   });
+
+  it("does not play when monitorDiagnostics is false", async () => {
+    const harness = await loadDiagnosticsMonitorHarness();
+    const settings = createSettings({ monitorDiagnostics: false });
+    const activeKey = harness.activeUri.toString();
+
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("error message", 0),
+    ]);
+
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(harness.playAlert).not.toHaveBeenCalled();
+  });
+
+  it("does not play when extension is disabled", async () => {
+    const harness = await loadDiagnosticsMonitorHarness();
+    const settings = createSettings({ enabled: false });
+    const activeKey = harness.activeUri.toString();
+
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("error message", 0),
+    ]);
+
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(harness.playAlert).not.toHaveBeenCalled();
+  });
+
+  it("does not play when diagnostics are empty", async () => {
+    const harness = await loadDiagnosticsMonitorHarness();
+    const settings = createSettings();
+    const activeKey = harness.activeUri.toString();
+
+    harness.diagnosticsByUri.set(activeKey, []);
+
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(harness.playAlert).not.toHaveBeenCalled();
+  });
+
+  it("triggers only once for multiple errors detected in the same scan", async () => {
+    const harness = await loadDiagnosticsMonitorHarness();
+    const settings = createSettings();
+    const activeKey = harness.activeUri.toString();
+
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("first error", 0, 1),
+      createDiagnostic("second error", 0, 2),
+      createDiagnostic("third error", 0, 3),
+    ]);
+
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(harness.playAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("plays again after monitor state is disposed/reset", async () => {
+    const harness = await loadDiagnosticsMonitorHarness();
+    const settings = createSettings();
+    const activeKey = harness.activeUri.toString();
+
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("recurrent error", 0),
+    ]);
+
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.wav",
+    );
+    expect(harness.playAlert).toHaveBeenCalledTimes(1);
+
+    // Second scan without reset: deduplicated, no sound
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.wav",
+    );
+    expect(harness.playAlert).toHaveBeenCalledTimes(1);
+
+    // After reset: state cleared, alerts again
+    harness.diagnosticsMonitor.disposeDiagnosticsMonitorState();
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.wav",
+    );
+    expect(harness.playAlert).toHaveBeenCalledTimes(2);
+  });
 });

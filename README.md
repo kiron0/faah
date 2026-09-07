@@ -72,6 +72,44 @@ Command Palette commands:
 - `Faah: Clear Snooze`
 - `Faah: Set Quiet Hours`
 - `Faah: Show Compatibility Status` (raises host compatibility info)
+- `Faah: Copy Zsh Integration Fix` (copies shell integration snippet to clipboard)
+
+---
+
+## Terminal Shell Integration (Zsh, Bash, Fish)
+
+Faah monitors terminal output and exit codes using the VS Code Terminal Shell Integration API.
+
+### If Zsh terminal errors don't trigger alerts:
+
+Zsh setups (especially with **Oh My Zsh**, **Powerlevel10k**, or custom themes) may block automatic shell integration injection.
+
+1. **Verify Shell Integration Setting**:
+   In VS Code settings, make sure `terminal.integrated.shellIntegration.enabled` is checked (`true`).
+
+2. **Add Manual Injection to `~/.zshrc`**:
+   Add this snippet to the bottom of `~/.zshrc` (or run `Faah: Copy Zsh Integration Fix` in the Command Palette):
+
+   ```zsh
+   # VS Code / Cursor Terminal Shell Integration for Zsh
+   if [[ "$TERM_PROGRAM" == "vscode" ]] && command -v code >/dev/null 2>&1; then
+     . "$(code --locate-shell-integration-path zsh 2>/dev/null)"
+   elif [[ "$TERM_PROGRAM" == "cursor" ]] && command -v cursor >/dev/null 2>&1; then
+     . "$(cursor --locate-shell-integration-path zsh 2>/dev/null)"
+   fi
+   ```
+
+3. **Powerlevel10k Instant Prompt**:
+   If using Powerlevel10k, open `~/.p10k.zsh` (or `~/.zshrc`) and set:
+
+   ```zsh
+   typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
+   ```
+
+   (or `off`). Instant prompt suppresses VS Code's script injection sequences if left verbose.
+
+4. **Verify**:
+   Open a new terminal. Look for a blue circle decoration in the gutter next to your prompt. That indicates Shell Integration is active.
 
 ---
 

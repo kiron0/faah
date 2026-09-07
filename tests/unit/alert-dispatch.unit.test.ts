@@ -71,4 +71,83 @@ describe("alert dispatch unit tests", () => {
       "Faah detected editor diagnostics.",
     );
   });
+
+  it("shows the correct message for terminal errors", async () => {
+    vi.resetModules();
+    const playAlert = vi.fn();
+    const showWarningMessage = vi.fn();
+
+    vi.doMock("../../src/audio", () => ({
+      playAlert,
+      prewarmAudioBackend: vi.fn(),
+    }));
+    vi.doMock("vscode", () => ({ window: { showWarningMessage } }));
+
+    const dispatch = await import("../../src/alert-dispatch");
+
+    dispatch.triggerAlert(
+      "terminal",
+      createSettings({ showVisualNotifications: true }),
+      "media/faah.wav",
+    );
+
+    expect(showWarningMessage).toHaveBeenCalledWith(
+      "Faah detected terminal error output.",
+    );
+  });
+
+  it("throttles consecutive visual alerts within 1200ms window", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.resetModules();
+      const playAlert = vi.fn();
+      const showWarningMessage = vi.fn();
+
+      vi.doMock("../../src/audio", () => ({
+        playAlert,
+        prewarmAudioBackend: vi.fn(),
+      }));
+      vi.doMock("vscode", () => ({ window: { showWarningMessage } }));
+
+      const dispatch = await import("../../src/alert-dispatch");
+      const settings = createSettings({ showVisualNotifications: true });
+
+      dispatch.triggerAlert("terminal", settings, "media/faah.wav");
+      expect(showWarningMessage).toHaveBeenCalledTimes(1);
+
+      // Trigger again immediately
+      dispatch.triggerAlert("terminal", settings, "media/faah.wav");
+      expect(showWarningMessage).toHaveBeenCalledTimes(1); // Throttled!
+
+      // Advance past 1200ms
+      vi.advanceTimersByTime(1250);
+      dispatch.triggerAlert("terminal", settings, "media/faah.wav");
+      expect(showWarningMessage).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("throttles visual alerts per-source independently", async () => {
+    vi.resetModules();
+    const playAlert = vi.fn();
+    const showWarningMessage = vi.fn();
+
+    vi.doMock("../../src/audio", () => ({
+      playAlert,
+      prewarmAudioBackend: vi.fn(),
+    }));
+    vi.doMock("vscode", () => ({ window: { showWarningMessage } }));
+
+    const dispatch = await import("../../src/alert-dispatch");
+    const settings = createSettings({ showVisualNotifications: true });
+
+    // Terminal triggers first
+    dispatch.triggerAlert("terminal", settings, "media/faah.wav");
+    expect(showWarningMessage).toHaveBeenCalledTimes(1);
+
+    // Diagnostics triggers immediately after -> not blocked by terminal throttle
+    dispatch.triggerAlert("diagnostics", settings, "media/faah.wav");
+    expect(showWarningMessage).toHaveBeenCalledTimes(2);
+  });
 });

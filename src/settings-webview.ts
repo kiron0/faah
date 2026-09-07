@@ -762,8 +762,10 @@ function renderSettingsWebview(
       <article class="card full notice">
         <label>Host Compatibility</label>
         <div class="hint">${terminalStatusMessage}</div>
+        <div class="hint" style="margin-top: 8px;">Using Zsh, Oh My Zsh, or Powerlevel10k? If terminal errors do not trigger alerts, add VS Code shell integration to your <code>~/.zshrc</code>.</div>
         <div class="button-row">
           <button class="secondary" id="compatibilityBtn" type="button">Show Compatibility Status</button>
+          <button class="secondary" id="copyZshBtn" type="button">Copy Zsh Fix</button>
         </div>
       </article>
 
@@ -991,6 +993,7 @@ function renderSettingsWebview(
 
     const ui = {
       compatibilityBtn: document.getElementById("compatibilityBtn"),
+      copyZshBtn: document.getElementById("copyZshBtn"),
       enabledSwitch: document.getElementById("enabledSwitch"),
       monitorTerminalSwitch: document.getElementById("monitorTerminalSwitch"),
       monitorDiagnosticsSwitch: document.getElementById("monitorDiagnosticsSwitch"),
@@ -1436,6 +1439,9 @@ function renderSettingsWebview(
     ui.compatibilityBtn.addEventListener("click", () => {
       vscode.postMessage({ type: "showCompatibilityStatus" });
     });
+    ui.copyZshBtn?.addEventListener("click", () => {
+      vscode.postMessage({ type: "copyZshFix" });
+    });
     ui.monitorTerminalSwitch.addEventListener("click", () => {
       if (!terminalMonitoringSupported) {
         flashStatus("Terminal monitoring is unavailable in this host.", "error");
@@ -1763,6 +1769,11 @@ export function registerSettingsUiCommand(
           await vscode.commands.executeCommand(
             commandIds.showCompatibilityStatus,
           );
+          return;
+        }
+
+        if (message.type === "copyZshFix") {
+          await vscode.commands.executeCommand(commandIds.copyZshFix);
           return;
         }
 

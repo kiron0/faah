@@ -315,4 +315,84 @@ describe("settings unit tests", () => {
     expect(preset.showVisualNotifications).toBe(true);
     expect(preset.diagnosticsSeverity).toBe("warningAndError");
   });
+
+  it("applies the balanced preset with default cooldowns and terminal enabled when supported", async () => {
+    const settings = await loadSettingsModule();
+
+    const preset = settings.createPresetSettings(
+      settings.defaultStoredSettings,
+      "balanced",
+      true,
+    );
+
+    expect(preset.monitorTerminal).toBe(true);
+    expect(preset.showVisualNotifications).toBe(false);
+    expect(preset.diagnosticsSeverity).toBe("error");
+    expect(preset.cooldownMs).toBe(1500);
+    expect(preset.terminalCooldownMs).toBe(1500);
+    expect(preset.diagnosticsCooldownMs).toBe(1500);
+  });
+
+  it("applies the aggressive preset with short cooldowns and warningAndError severity", async () => {
+    const settings = await loadSettingsModule();
+
+    const preset = settings.createPresetSettings(
+      settings.defaultStoredSettings,
+      "aggressive",
+      true,
+    );
+
+    expect(preset.monitorTerminal).toBe(true);
+    expect(preset.diagnosticsSeverity).toBe("warningAndError");
+    expect(preset.terminalCooldownMs).toBe(700);
+    expect(preset.diagnosticsCooldownMs).toBe(700);
+    expect(preset.volumePercent).toBe(90);
+  });
+
+  it("clamps negative volume to 0 and negative cooldown to 500ms", async () => {
+    const settings = await loadSettingsModule();
+
+    const normalized = settings.normalizeStoredSettings({
+      volumePercent: -50,
+      cooldownMs: -100,
+      terminalCooldownMs: -200,
+      diagnosticsCooldownMs: -300,
+    });
+
+    expect(normalized.volumePercent).toBe(0);
+    expect(normalized.cooldownMs).toBe(500);
+    expect(normalized.terminalCooldownMs).toBe(500);
+    expect(normalized.diagnosticsCooldownMs).toBe(500);
+  });
+
+  it("validates quiet hours time strings with isValidQuietHoursTime", async () => {
+    const settings = await loadSettingsModule();
+
+    expect(settings.isValidQuietHoursTime("00:00")).toBe(true);
+    expect(settings.isValidQuietHoursTime("07:30")).toBe(true);
+    expect(settings.isValidQuietHoursTime("12:00")).toBe(true);
+    expect(settings.isValidQuietHoursTime("23:59")).toBe(true);
+
+    expect(settings.isValidQuietHoursTime("24:00")).toBe(false);
+    expect(settings.isValidQuietHoursTime("12:60")).toBe(false);
+    expect(settings.isValidQuietHoursTime("9:30")).toBe(false);
+    expect(settings.isValidQuietHoursTime("abc")).toBe(false);
+    expect(settings.isValidQuietHoursTime("")).toBe(false);
+  });
+
+  it("falls back to default quiet hours times when invalid format is stored", async () => {
+    const settings = await loadSettingsModule();
+
+    const normalized = settings.normalizeStoredSettings({
+      quietHoursStart: "25:00",
+      quietHoursEnd: "invalid",
+    });
+
+    expect(normalized.quietHoursStart).toBe(
+      settings.defaultStoredSettings.quietHoursStart,
+    );
+    expect(normalized.quietHoursEnd).toBe(
+      settings.defaultStoredSettings.quietHoursEnd,
+    );
+  });
 });

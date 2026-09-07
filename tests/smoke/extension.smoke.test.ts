@@ -38,6 +38,8 @@ type Harness = {
     registerSettingsUiCommand: ReturnType<typeof vi.fn>;
     persistStoredSettings: ReturnType<typeof vi.fn>;
     toRuntimeSettings: ReturnType<typeof vi.fn>;
+    writeClipboardText: ReturnType<typeof vi.fn>;
+    showInformationMessage: ReturnType<typeof vi.fn>;
   };
   storedSettings: StoredSettings;
   runtimeSettings: RuntimeSettings;
@@ -119,8 +121,11 @@ async function loadExtensionHarness(
   const scanActiveEditorDiagnostics = vi.fn();
   const playAlert = vi.fn();
   const resolveSoundPath = vi.fn(() => "media/faah.wav");
-  const registerSettingsUiCommand = vi.fn(() => ({ dispose: vi.fn() }));
+  const settingsDisposable = { dispose: vi.fn() };
+  const registerSettingsUiCommand = vi.fn(() => settingsDisposable);
   const executeCommand = vi.fn(async () => {});
+  const writeClipboardText = vi.fn(async () => undefined);
+  const showInformationMessage = vi.fn(async () => undefined);
 
   const storedSettings = createStoredSettings(enabled);
   const runtimeSettings = createRuntimeSettings(storedSettings);
@@ -137,7 +142,6 @@ async function loadExtensionHarness(
   const activeEditorDisposable = { dispose: vi.fn() };
   const diagnosticsDisposable = { dispose: vi.fn() };
   const commandDisposable = { dispose: vi.fn() };
-  const settingsDisposable = { dispose: vi.fn() };
   const statusBarDisposable = { dispose: vi.fn() };
   const statusBarItem = {
     text: "",
@@ -177,9 +181,16 @@ async function loadExtensionHarness(
       }),
       createStatusBarItem: vi.fn(() => statusBarItem),
       showQuickPick: vi.fn(async () => undefined),
-      showInformationMessage: vi.fn(async () => undefined),
+      showInformationMessage,
       showInputBox: vi.fn(async () => undefined),
     },
+    env: {
+      appName: "VS Code",
+      clipboard: {
+        writeText: writeClipboardText,
+      },
+    },
+    version: "1.95.0",
     workspace: {
       onDidChangeTextDocument: vi.fn(
         (
@@ -229,16 +240,7 @@ async function loadExtensionHarness(
     disposeDiagnosticsMonitorState: vi.fn(),
   }));
   vi.doMock("../../src/settings-webview", () => ({
-    registerSettingsUiCommand: registerSettingsUiCommand.mockImplementation(
-      (
-        _context: unknown,
-        _getStored: () => StoredSettings,
-        _applySettings: (next: StoredSettings) => Promise<void>,
-        _playTestSound: (next: StoredSettings) => void,
-        _terminalMonitoringCapability: string,
-        _commandId: string,
-      ) => settingsDisposable,
-    ),
+    registerSettingsUiCommand,
   }));
   vi.doMock("../../src/settings", () => ({
     loadStoredSettings,
@@ -281,6 +283,8 @@ async function loadExtensionHarness(
       registerSettingsUiCommand,
       persistStoredSettings,
       toRuntimeSettings,
+      writeClipboardText,
+      showInformationMessage,
     },
     storedSettings,
     runtimeSettings,
@@ -298,7 +302,7 @@ describe("extension smoke tests", () => {
     const textDocumentHandler = harness.getTextDocumentHandler();
     const diagnosticsHandler = harness.getDiagnosticsHandler();
 
-    expect(harness.context.subscriptions).toHaveLength(17);
+    expect(harness.context.subscriptions).toHaveLength(18);
     expect(startHandler).toBeTypeOf("function");
     expect(endHandler).toBeTypeOf("function");
     expect(activeEditorHandler).toBeTypeOf("function");
@@ -313,6 +317,7 @@ describe("extension smoke tests", () => {
     expect(harness.commandHandlers.has("faah.snoozeAlerts")).toBe(true);
     expect(harness.commandHandlers.has("faah.clearSnooze")).toBe(true);
     expect(harness.commandHandlers.has("faah.setQuietHours")).toBe(true);
+    expect(harness.commandHandlers.has("faah.copyZshFix")).toBe(true);
     expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(1);
 
     const execution = {
@@ -365,7 +370,7 @@ describe("extension smoke tests", () => {
     const textDocumentHandler = harness.getTextDocumentHandler();
     const diagnosticsHandler = harness.getDiagnosticsHandler();
 
-    expect(harness.context.subscriptions).toHaveLength(15);
+    expect(harness.context.subscriptions).toHaveLength(16);
     expect(harness.getStartHandler()).toBeUndefined();
     expect(harness.getEndHandler()).toBeUndefined();
     expect(activeEditorHandler).toBeTypeOf("function");
@@ -805,5 +810,60 @@ describe("extension smoke tests", () => {
       "Play Test Sound",
       "Show Compatibility",
     );
+  });
+
+  it("copies zsh integration fix to clipboard and shows confirmation", async () => {
+    const harness = await loadExtensionHarness(true);
+    harness.extension.activate(harness.context as any);
+
+    const copyZshCmd = harness.commandHandlers.get("faah.copyZshFix");
+    expect(copyZshCmd).toBeTypeOf("function");
+
+    await copyZshCmd?.();
+
+    expect(harness.mocks.writeClipboardText).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "# VS Code / Cursor Terminal Shell Integration for Zsh",
+      ),
+    );
+    expect(harness.mocks.showInformationMessage).toHaveBeenCalledWith(
+      expect.stringContaining("Copied Zsh shell integration fix to clipboard"),
+    );
+  });
+
+  it("clears snooze and shows confirmation when faah.clearSnooze is executed", async () => {
+    const harness = await loadExtensionHarness(true);
+    harness.extension.activate(harness.context as any);
+
+    const clearSnoozeCmd = harness.commandHandlers.get("faah.clearSnooze");
+    expect(clearSnoozeCmd).toBeTypeOf("function");
+
+    await clearSnoozeCmd?.();
+
+    expect(harness.mocks.showInformationMessage).toHaveBeenCalledWith(
+      "Faah snooze cleared.",
+    );
+  });
+
+  it("shows compatibility status when faah.showCompatibilityStatus is executed", async () => {
+    const harness = await loadExtensionHarness(true);
+    harness.extension.activate(harness.context as any);
+
+    const compatCmd = harness.commandHandlers.get(
+      "faah.showCompatibilityStatus",
+    );
+    expect(compatCmd).toBeTypeOf("function");
+
+    await compatCmd?.();
+
+    expect(harness.mocks.showInformationMessage).toHaveBeenCalledWith(
+      expect.stringContaining("reports IDE API"),
+    );
+  });
+
+  it("exports a no-op deactivate function", async () => {
+    const harness = await loadExtensionHarness(true);
+    expect(harness.extension.deactivate).toBeTypeOf("function");
+    expect(() => harness.extension.deactivate()).not.toThrow();
   });
 });
