@@ -3,9 +3,9 @@
 
 # Faah - Error Alerts
 
-### Your Error Drama Alarm for IDEs
+### Your Error Drama Alarm for Developers
 
-Never miss errors in your editor. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.
+Instant drama the second your code breaks. Audio alerts for terminal errors and editor diagnostics, with one-click status bar controls.
 
   <p>
     <img src="https://img.shields.io/badge/VS%20Code-1.105.0%2B-0ea5e9?style=for-the-badge&logo=visualstudiocode&logoColor=white" />

@@ -1,7 +1,7 @@
 {
   "name": "faah",
   "displayName": "Faah - Error Alerts",
-  "description": "Never miss errors in your editor. Faah plays instant alerts for terminal failures and editor diagnostics, with one-click status bar controls.",
+  "description": "Instant drama the second your code breaks. Audio alerts for terminal errors and editor diagnostics.",
   "icon": "images/icon.png",
   "version": "0.2.3",
   "publisher": "thk",
