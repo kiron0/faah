@@ -6,9 +6,13 @@ import * as vscode from "vscode";
 export const zshIntegrationSnippet = [
   "# VS Code / Cursor Terminal Shell Integration for Zsh",
   'if [[ "$TERM_PROGRAM" == "vscode" ]] && command -v code >/dev/null 2>&1; then',
-  '  . "$(code --locate-shell-integration-path zsh 2>/dev/null)"',
+  '  _vsi="$(code --locate-shell-integration-path zsh 2>/dev/null)"',
+  '  [[ -n "$_vsi" && -f "$_vsi" ]] && . "$_vsi"',
+  '  unset _vsi',
   'elif [[ "$TERM_PROGRAM" == "cursor" ]] && command -v cursor >/dev/null 2>&1; then',
-  '  . "$(cursor --locate-shell-integration-path zsh 2>/dev/null)"',
+  '  _csi="$(cursor --locate-shell-integration-path zsh 2>/dev/null)"',
+  '  [[ -n "$_csi" && -f "$_csi" ]] && . "$_csi"',
+  '  unset _csi',
   "fi",
 ].join("\n");
 

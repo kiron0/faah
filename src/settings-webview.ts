@@ -1041,10 +1041,14 @@ function renderSettingsWebview(
             <span id="copySnippetText">Copy</span>
           </button>
           <div class="faq-code" id="zshSnippetCode"># VS Code / Cursor Terminal Shell Integration for Zsh
-if [[ "$TERM_PROGRAM" == "vscode" ]] && command -v code &gt;/dev/null 2&gt;&amp;1; then
-  . "$(code --locate-shell-integration-path zsh 2&gt;/dev/null)"
-elif [[ "$TERM_PROGRAM" == "cursor" ]] && command -v cursor &gt;/dev/null 2&gt;&amp;1; then
-  . "$(cursor --locate-shell-integration-path zsh 2&gt;/dev/null)"
+if [[ "$TERM_PROGRAM" == "vscode" ]] &amp;&amp; command -v code &gt;/dev/null 2&gt;&amp;1; then
+  _vsi="$(code --locate-shell-integration-path zsh 2&gt;/dev/null)"
+  [[ -n "$_vsi" &amp;&amp; -f "$_vsi" ]] &amp;&amp; . "$_vsi"
+  unset _vsi
+elif [[ "$TERM_PROGRAM" == "cursor" ]] &amp;&amp; command -v cursor &gt;/dev/null 2&gt;&amp;1; then
+  _csi="$(cursor --locate-shell-integration-path zsh 2&gt;/dev/null)"
+  [[ -n "$_csi" &amp;&amp; -f "$_csi" ]] &amp;&amp; . "$_csi"
+  unset _csi
 fi</div>
         </div>
         <div class="hint">After adding, restart terminal with <code>Ctrl+\`</code> / <code>Cmd+\`</code> or run <code>source ~/.zshrc</code>.</div>
