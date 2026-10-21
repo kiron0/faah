@@ -287,10 +287,10 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/play-sound": "^1.1.2",
-    "@types/vscode": "1.105.0",
+    "@types/vscode": "~1.105.0",
     "@vscode/vsce": "^4.0.0",
     "prettier": "^3.9.10",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   }
 }
