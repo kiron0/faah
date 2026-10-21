@@ -317,7 +317,7 @@ describe("extension smoke tests", () => {
     expect(harness.commandHandlers.has("faah.snoozeAlerts")).toBe(true);
     expect(harness.commandHandlers.has("faah.clearSnooze")).toBe(true);
     expect(harness.commandHandlers.has("faah.setQuietHours")).toBe(true);
-    expect(harness.commandHandlers.has("faah.copyZshFix")).toBe(true);
+    expect(harness.commandHandlers.has("faah.showCliSetup")).toBe(true);
     expect(harness.mocks.scanActiveEditorDiagnostics).toHaveBeenCalledTimes(1);
 
     const execution = {
@@ -812,23 +812,25 @@ describe("extension smoke tests", () => {
     );
   });
 
-  it("copies zsh integration fix to clipboard and shows confirmation", async () => {
+  it("points users to the faah cli for alerts outside the ide", async () => {
     const harness = await loadExtensionHarness(true);
     harness.extension.activate(harness.context as any);
 
-    const copyZshCmd = harness.commandHandlers.get("faah.copyZshFix");
-    expect(copyZshCmd).toBeTypeOf("function");
+    const cliSetupCmd = harness.commandHandlers.get("faah.showCliSetup");
+    expect(cliSetupCmd).toBeTypeOf("function");
 
-    harness.mocks.showInformationMessage.mockResolvedValueOnce("Copy Snippet");
-    await copyZshCmd?.();
-
-    expect(harness.mocks.writeClipboardText).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "# VS Code / Cursor Terminal Shell Integration for Zsh\nif [[",
-      ),
+    harness.mocks.showInformationMessage.mockResolvedValueOnce(
+      "Copy install command",
     );
+    await cliSetupCmd?.();
+
     expect(harness.mocks.showInformationMessage).toHaveBeenCalledWith(
-      expect.stringContaining("Copied Zsh shell integration fix to clipboard"),
+      expect.stringContaining("npm i -g faahh"),
+      "Open npm",
+      "Copy install command",
+    );
+    expect(harness.mocks.writeClipboardText).toHaveBeenCalledWith(
+      "npm i -g faahh",
     );
   });
 

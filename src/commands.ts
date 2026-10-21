@@ -6,5 +6,5 @@ export const commandIds = {
   snoozeAlerts: "faah.snoozeAlerts",
   clearSnooze: "faah.clearSnooze",
   setQuietHours: "faah.setQuietHours",
-  copyZshFix: "faah.copyZshFix",
+  showCliSetup: "faah.showCliSetup",
 } as const;

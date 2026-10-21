@@ -129,6 +129,7 @@ export function createStatusBarController(): {
       ...(isSnoozed
         ? [`Snooze remaining: ${formatSnoozeRemaining(snoozeRemainingMs)}`]
         : []),
+      "Outside the IDE? Install Faah CLI: npm i -g faahh",
       "Click for quick actions.",
     ].join("\n");
   };

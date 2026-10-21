@@ -80,8 +80,8 @@
         "category": "Faah"
       },
       {
-        "command": "faah.copyZshFix",
-        "title": "Fix Zsh Terminal Integration",
+        "command": "faah.showCliSetup",
+        "title": "Install Faah CLI (alerts outside the IDE)",
         "category": "Faah"
       }
     ],

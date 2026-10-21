@@ -75,7 +75,7 @@ Command Palette commands:
 - `Faah: Clear Snooze`
 - `Faah: Set Quiet Hours`
 - `Faah: Show Compatibility Status` (raises host compatibility info)
-- `Faah: Fix Zsh Terminal Integration` (automatically adds shell integration to `~/.zshrc` or copies snippet)
+- `Faah: Install Faah CLI (alerts outside the IDE)` (opens the CLI install guide)
 
 ---
 
@@ -90,21 +90,16 @@ Zsh setups (especially with **Oh My Zsh**, **Powerlevel10k**, or custom themes) 
 1. **Verify Shell Integration Setting**:
    In VS Code settings, make sure `terminal.integrated.shellIntegration.enabled` is checked (`true`).
 
-2. **Add Manual Injection to `~/.zshrc`**:
-   Run `Faah: Fix Zsh Terminal Integration` in the Command Palette (or click **Fix Zsh Integration** in Settings UI) to add it automatically or copy the snippet:
+2. **Use Faah CLI instead**:
+   The extension only covers terminals inside the IDE. The CLI covers every terminal, sets up zsh, bash or fish for you, and needs no shell integration:
 
-   ```zsh
-   # VS Code / Cursor Terminal Shell Integration for Zsh
-   if [[ "$TERM_PROGRAM" == "vscode" ]] && command -v code >/dev/null 2>&1; then
-     _vsi="$(code --locate-shell-integration-path zsh 2>/dev/null)"
-     [[ -n "$_vsi" && -f "$_vsi" ]] && . "$_vsi"
-     unset _vsi
-   elif [[ "$TERM_PROGRAM" == "cursor" ]] && command -v cursor >/dev/null 2>&1; then
-     _csi="$(cursor --locate-shell-integration-path zsh 2>/dev/null)"
-     [[ -n "$_csi" && -f "$_csi" ]] && . "$_csi"
-     unset _csi
-   fi
+   ```bash
+   npm i -g faahh
+   faah init
+   faah verify
    ```
+
+   Run `Faah: Install Faah CLI (alerts outside the IDE)` from the Command Palette for the install guide.
 
 3. **Powerlevel10k Instant Prompt**:
    If using Powerlevel10k, open `~/.p10k.zsh` (or `~/.zshrc`) and set:

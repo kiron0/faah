@@ -219,49 +219,11 @@ function renderSettingsWebview(
       border-color: rgba(255, 208, 117, 0.18);
     }
 
-    .snippet-container {
-      position: relative;
-      margin: 8px 0;
-    }
-
-    .snippet-copy-btn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      padding: 3px 8px !important;
-      font-size: 0.72rem !important;
-      font-weight: 500 !important;
-      background: rgba(255, 255, 255, 0.08) !important;
-      border: 1px solid rgba(255, 255, 255, 0.15) !important;
-      border-radius: 4px !important;
-      color: #cbd5e1 !important;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 150ms ease;
-      user-select: none;
-      z-index: 2;
-    }
-
-    .snippet-copy-btn:hover {
-      background: rgba(255, 255, 255, 0.16) !important;
-      border-color: rgba(255, 255, 255, 0.3) !important;
-      color: #ffffff !important;
-    }
-
-    .snippet-copy-btn.copied {
-      background: rgba(34, 197, 94, 0.2) !important;
-      border-color: rgba(34, 197, 94, 0.4) !important;
-      color: #86efac !important;
-    }
-
     .faq-code {
       border: 1px solid var(--input-border);
       background: var(--input-bg);
       border-radius: 6px;
       padding: 10px 12px;
-      padding-right: 70px;
       font-family: "SFMono-Regular", Menlo, Consolas, monospace;
       font-size: 0.78rem;
       color: #e6f0ff;
@@ -1026,33 +988,12 @@ function renderSettingsWebview(
 
     <section id="tab-faq" class="grid tab-content hidden" role="tabpanel" aria-label="Troubleshooting">
       <article class="card full">
-        <label>Zsh Shell Integration (Oh My Zsh / Powerlevel10k)</label>
-        <div class="hint">Themes like Oh My Zsh or Powerlevel10k can override prompt hooks, preventing VS Code and Cursor from detecting non-zero command exit codes.</div>
-        <div class="hint">Adding VS Code's shell integration locator to your <code>~/.zshrc</code> restores exit-code alerts instantly.</div>
+        <label>Need Alerts Outside the IDE?</label>
+        <div class="hint">Faah CLI covers every terminal, not just the IDE. It installs shell hooks for zsh, bash or fish and plays the alert on any failed command.</div>
+        <div class="hint">Install with <code>npm i -g faahh</code>, then run <code>faah init</code> once and <code>faah verify</code> to confirm.</div>
         <div class="button-row">
-          <button class="secondary" id="copyZshBtn" type="button">Fix Zsh Integration (~/.zshrc)</button>
+          <button class="secondary" id="cliSetupBtn" type="button">Open CLI Install Guide</button>
         </div>
-      </article>
-
-      <article class="card full">
-        <label>Terminal Integration Snippet</label>
-        <div class="snippet-container">
-          <button class="snippet-copy-btn" id="copySnippetBtn" type="button" aria-label="Copy snippet to clipboard">
-            <span id="copySnippetIcon">📋</span>
-            <span id="copySnippetText">Copy</span>
-          </button>
-          <div class="faq-code" id="zshSnippetCode"># VS Code / Cursor Terminal Shell Integration for Zsh
-if [[ "$TERM_PROGRAM" == "vscode" ]] &amp;&amp; command -v code &gt;/dev/null 2&gt;&amp;1; then
-  _vsi="$(code --locate-shell-integration-path zsh 2&gt;/dev/null)"
-  [[ -n "$_vsi" &amp;&amp; -f "$_vsi" ]] &amp;&amp; . "$_vsi"
-  unset _vsi
-elif [[ "$TERM_PROGRAM" == "cursor" ]] &amp;&amp; command -v cursor &gt;/dev/null 2&gt;&amp;1; then
-  _csi="$(cursor --locate-shell-integration-path zsh 2&gt;/dev/null)"
-  [[ -n "$_csi" &amp;&amp; -f "$_csi" ]] &amp;&amp; . "$_csi"
-  unset _csi
-fi</div>
-        </div>
-        <div class="hint">After adding, restart terminal with <code>Ctrl+\`</code> / <code>Cmd+\`</code> or run <code>source ~/.zshrc</code>.</div>
       </article>
 
       <article class="card">
@@ -1065,7 +1006,7 @@ fi</div>
       <article class="card">
         <label>Other Shells & Editors</label>
         <div class="hint"><strong>Bash & PowerShell:</strong> Built-in integration works automatically in VS Code.</div>
-        <div class="hint"><strong>Cursor & Forks:</strong> The snippet above detects both VS Code and Cursor automatically.</div>
+        <div class="hint"><strong>Other editors & plain terminals:</strong> use Faah CLI, it sets up zsh, bash or fish for you.</div>
       </article>
     </section>
 
@@ -1091,8 +1032,7 @@ fi</div>
 
     const ui = {
       compatibilityBtn: document.getElementById("compatibilityBtn"),
-      copyZshBtn: document.getElementById("copyZshBtn"),
-      copySnippetBtn: document.getElementById("copySnippetBtn"),
+      cliSetupBtn: document.getElementById("cliSetupBtn"),
       enabledSwitch: document.getElementById("enabledSwitch"),
       monitorTerminalSwitch: document.getElementById("monitorTerminalSwitch"),
       monitorDiagnosticsSwitch: document.getElementById("monitorDiagnosticsSwitch"),
@@ -1554,35 +1494,8 @@ fi</div>
     ui.compatibilityBtn.addEventListener("click", () => {
       vscode.postMessage({ type: "showCompatibilityStatus" });
     });
-    ui.copyZshBtn?.addEventListener("click", () => {
-      vscode.postMessage({ type: "copyZshFix" });
-    });
-    ui.copySnippetBtn?.addEventListener("click", () => {
-      const codeEl = document.getElementById("zshSnippetCode");
-      const textToCopy = codeEl ? codeEl.innerText.trim() : "";
-      if (!textToCopy) return;
-
-      const setCopiedState = () => {
-        ui.copySnippetBtn?.classList.add("copied");
-        const textEl = document.getElementById("copySnippetText");
-        const iconEl = document.getElementById("copySnippetIcon");
-        if (textEl) textEl.textContent = "Copied!";
-        if (iconEl) iconEl.textContent = "✓";
-        flashPill("Zsh snippet copied to clipboard!");
-        setTimeout(() => {
-          ui.copySnippetBtn?.classList.remove("copied");
-          if (textEl) textEl.textContent = "Copy";
-          if (iconEl) iconEl.textContent = "📋";
-        }, 2000);
-      };
-
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(textToCopy).then(setCopiedState).catch(() => {
-          vscode.postMessage({ type: "copyZshFix" });
-        });
-      } else {
-        vscode.postMessage({ type: "copyZshFix" });
-      }
+    ui.cliSetupBtn?.addEventListener("click", () => {
+      vscode.postMessage({ type: "showCliSetup" });
     });
     ui.monitorTerminalSwitch.addEventListener("click", () => {
       if (!terminalMonitoringSupported) {
@@ -1929,8 +1842,8 @@ export function registerSettingsUiCommand(
           return;
         }
 
-        if (message.type === "copyZshFix") {
-          await vscode.commands.executeCommand(commandIds.copyZshFix);
+        if (message.type === "showCliSetup") {
+          await vscode.commands.executeCommand(commandIds.showCliSetup);
           return;
         }
 

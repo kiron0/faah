@@ -45,7 +45,26 @@ import {
   isExecutionIdentity,
   isTerminalExecutionLike,
 } from "./terminal-shell-integration";
-import { handleZshFixCommand } from "./zsh-fix";
+
+const cliSetupUrl = "https://www.npmjs.com/package/faahh";
+const cliInstallCommand = "npm i -g faahh";
+
+async function showCliSetupGuide(): Promise<void> {
+  const choice = await vscode.window.showInformationMessage(
+    "Faah CLI alerts in any terminal, outside the IDE, and sets up zsh, bash or fish for you. Install: npm i -g faahh",
+    "Open npm",
+    "Copy install command",
+  );
+
+  if (choice === "Open npm") {
+    await vscode.env.openExternal(vscode.Uri.parse(cliSetupUrl));
+    return;
+  }
+
+  if (choice === "Copy install command") {
+    await vscode.env.clipboard.writeText(cliInstallCommand);
+  }
+}
 
 const editorDiagnosticsTypingDebounceMs = 300;
 const statusRefreshIntervalMs = 15_000;
@@ -402,10 +421,10 @@ export function activate(context: vscode.ExtensionContext): void {
     showCompatibilityStatus,
   );
 
-  const copyZshFixDisposable = vscode.commands.registerCommand(
-    commandIds.copyZshFix,
+  const showCliSetupDisposable = vscode.commands.registerCommand(
+    commandIds.showCliSetup,
     async () => {
-      await handleZshFixCommand();
+      await showCliSetupGuide();
     },
   );
 
@@ -571,6 +590,7 @@ export function activate(context: vscode.ExtensionContext): void {
           | "setQuietHours"
           | "openSettings"
           | "showCompatibility"
+          | "showCliSetup"
           | "playTestSound";
       };
 
@@ -655,6 +675,12 @@ export function activate(context: vscode.ExtensionContext): void {
           action: "showCompatibility",
         },
         {
+          label: "Install Faah CLI (alerts outside the IDE)",
+          description:
+            "CLI sets up zsh, bash or fish and works in any terminal",
+          action: "showCliSetup",
+        },
+        {
           label: "Play Test Sound",
           description: "Verify audio output now",
           action: "playTestSound",
@@ -724,6 +750,9 @@ export function activate(context: vscode.ExtensionContext): void {
           await vscode.commands.executeCommand(
             commandIds.showCompatibilityStatus,
           );
+          break;
+        case "showCliSetup":
+          await vscode.commands.executeCommand(commandIds.showCliSetup);
           break;
         case "playTestSound":
           await vscode.commands.executeCommand(commandIds.playTestSound);
@@ -848,7 +877,7 @@ export function activate(context: vscode.ExtensionContext): void {
     clearSnoozeDisposable,
     quietHoursDisposable,
     quickActionsDisposable,
-    copyZshFixDisposable,
+    showCliSetupDisposable,
     { dispose: clearEditorTypingDebounce },
     { dispose: clearStatusRefreshTimer },
     { dispose: clearConfigurationReloadTimer },
