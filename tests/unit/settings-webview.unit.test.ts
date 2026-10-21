@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import type { StoredSettings } from "../../src/settings";
@@ -570,5 +574,101 @@ describe("settings webview unit tests", () => {
       type: "error",
       payload: "Unknown settings preset: nope",
     });
+  });
+
+  it("rejects imported settings that contain invalid regular expressions", async () => {
+    vi.resetModules();
+
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "faah-webview-test-"),
+    );
+    const importFile = path.join(tempDir, "faah-settings.json");
+    fs.writeFileSync(
+      importFile,
+      JSON.stringify({ patterns: ["("], excludePatterns: [] }),
+      "utf8",
+    );
+
+    let commandHandler: (() => Promise<void>) | undefined;
+    let receiveHandler:
+      | ((message: {
+          type: string;
+          payload?: unknown;
+          target?: string;
+        }) => Promise<void>)
+      | undefined;
+    const postMessage = vi.fn();
+    const onSaved = vi.fn(async () => undefined);
+
+    const panel = {
+      webview: {
+        html: "",
+        cspSource: "vscode-webview",
+        asWebviewUri: vi.fn((uri: unknown) => uri),
+        postMessage,
+        onDidReceiveMessage: vi.fn((cb: typeof receiveHandler) => {
+          receiveHandler = cb;
+          return { dispose: vi.fn() };
+        }),
+      },
+      reveal: vi.fn(),
+      onDidDispose: vi.fn(() => ({ dispose: vi.fn() })),
+      iconPath: undefined as unknown,
+    };
+
+    vi.doMock("vscode", () => ({
+      commands: {
+        registerCommand: vi.fn((_id: string, cb: () => Promise<void>) => {
+          commandHandler = cb;
+          return { dispose: vi.fn() };
+        }),
+      },
+      workspace: {
+        workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
+        onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+      window: {
+        createWebviewPanel: vi.fn(() => panel),
+        showOpenDialog: vi.fn(async () => [{ fsPath: importFile }]),
+      },
+      Uri: {
+        joinPath: vi.fn(() => ({ path: "/tmp/icon.png" })),
+      },
+      ViewColumn: {
+        One: 1,
+      },
+      Disposable: {
+        from: (...disposables: Array<{ dispose: () => void }>) => ({
+          dispose: () => {
+            disposables.forEach((disposable) => disposable.dispose());
+          },
+        }),
+      },
+    }));
+
+    const settingsWebview = await import("../../src/settings-webview");
+
+    settingsWebview.registerSettingsUiCommand(
+      { extensionUri: { fsPath: "/tmp/ext" } } as any,
+      () => createStoredSettings(true),
+      onSaved,
+      () => undefined,
+      "full",
+    );
+
+    await commandHandler?.();
+    await receiveHandler?.({
+      type: "importSettings",
+      target: "global",
+    });
+
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "error",
+      payload:
+        "Imported settings contain 1 invalid regular expression(s). Fix them before importing.",
+    });
+
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 });

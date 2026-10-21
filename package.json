@@ -285,12 +285,12 @@
     "play-sound": "^1.1.6"
   },
   "devDependencies": {
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.6.5",
     "@types/play-sound": "^1.1.2",
     "@types/vscode": "1.105.0",
-    "@vscode/vsce": "^3.9.2",
-    "prettier": "^3.9.6",
+    "@vscode/vsce": "^4.0.0",
+    "prettier": "^3.9.10",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.5"
   }
 }

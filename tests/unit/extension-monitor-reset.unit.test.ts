@@ -29,9 +29,11 @@ describe("extension monitor reset regression", () => {
   it("resets diagnostics and terminal caches when relevant configuration changes", async () => {
     vi.resetModules();
 
+    let currentSettings = createStoredSettings();
     const scanActiveEditorDiagnostics = vi.fn();
     const disposeDiagnosticsMonitorState = vi.fn();
     const resetExecutionMonitorState = vi.fn();
+    const loadStoredSettings = vi.fn(() => currentSettings);
     const statusUpdate = vi.fn();
     let configChangeHandler:
       | ((event: {
@@ -97,7 +99,7 @@ describe("extension monitor reset regression", () => {
       registerSettingsUiCommand: vi.fn(() => ({ dispose: vi.fn() })),
     }));
     vi.doMock("../../src/settings", () => ({
-      loadStoredSettings: vi.fn(() => createStoredSettings()),
+      loadStoredSettings,
       normalizeStoredSettings: vi.fn((settings: StoredSettings) => settings),
       persistStoredSettings: vi.fn(async () => ({
         skippedConfigurationKeys: [],
@@ -167,15 +169,35 @@ describe("extension monitor reset regression", () => {
     scanActiveEditorDiagnostics.mockClear();
     disposeDiagnosticsMonitorState.mockClear();
     resetExecutionMonitorState.mockClear();
+    loadStoredSettings.mockClear();
 
-    configChangeHandler?.({
+    const configChangeEvent = {
       affectsConfiguration: (section: string) =>
         section === "faah" ||
         section === "faah.patterns" ||
         section === "faah.patternMode" ||
         section === "faah.excludePresetIds" ||
         section === "faah.terminalDetectionMode",
-    });
+    };
+
+    configChangeHandler?.(configChangeEvent);
+    configChangeHandler?.(configChangeEvent);
+    configChangeHandler?.(configChangeEvent);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(loadStoredSettings).toHaveBeenCalledTimes(1);
+    expect(resetExecutionMonitorState).toHaveBeenCalledTimes(0);
+    expect(scanActiveEditorDiagnostics).toHaveBeenCalledTimes(0);
+
+    currentSettings = {
+      ...createStoredSettings(),
+      patterns: ["\\bchanged_error\\b"],
+    };
+
+    configChangeHandler?.(configChangeEvent);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
     expect(resetExecutionMonitorState).toHaveBeenCalledTimes(1);
     expect(disposeDiagnosticsMonitorState).not.toHaveBeenCalled();

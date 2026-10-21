@@ -12,7 +12,7 @@ export type TerminalExecutionLike = object & {
 let tailByExecution = new WeakMap<TerminalExecutionLike, string>();
 let playedByExecution = new WeakSet<object>();
 
-const MAX_TAIL_LENGTH = 500;
+const MAX_TAIL_LENGTH = 2000;
 const LINE_SPLIT_REGEX = /\r?\n/;
 const ANSI_ESCAPE_REGEX = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 
@@ -68,6 +68,7 @@ export function tryPlayForExecution(
   settings: RuntimeSettings,
   soundPath: string,
 ): void {
+  if (!settings.enabled) return;
   if (!settings.monitorTerminal) return;
   if (getAlertSuppressionReason(settings) !== null) return;
   if (playedByExecution.has(execution)) return;

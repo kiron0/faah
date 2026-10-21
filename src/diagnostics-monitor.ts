@@ -11,6 +11,7 @@ import type { RuntimeSettings } from "./settings";
 const lastFingerprintByUri = new Map<string, string>();
 const retryTimerByUri = new Map<string, ReturnType<typeof setTimeout>>();
 const FINGERPRINT_LINE_SEPARATOR = "\n";
+const MAX_TRACKED_FINGERPRINTS = 256;
 
 function normalizeDiagnosticCode(code: vscode.Diagnostic["code"]): string {
   if (typeof code === "string" || typeof code === "number") return String(code);
@@ -92,11 +93,19 @@ function scheduleRetry(
     },
     Math.max(50, delayMs),
   );
-  if (typeof timer.unref === "function") {
-    timer.unref();
-  }
 
   retryTimerByUri.set(uriKey, timer);
+}
+
+function rememberFingerprint(uriKey: string, fingerprint: string): void {
+  if (
+    !lastFingerprintByUri.has(uriKey) &&
+    lastFingerprintByUri.size >= MAX_TRACKED_FINGERPRINTS
+  ) {
+    const oldestKey = lastFingerprintByUri.keys().next().value;
+    if (oldestKey !== undefined) lastFingerprintByUri.delete(oldestKey);
+  }
+  lastFingerprintByUri.set(uriKey, fingerprint);
 }
 
 function tryPlayForEditor(
@@ -140,7 +149,7 @@ function tryPlayForEditor(
   }
 
   clearRetry(uriKey);
-  lastFingerprintByUri.set(uriKey, nextFingerprint);
+  rememberFingerprint(uriKey, nextFingerprint);
   triggerAlert("diagnostics", settings, getSoundPath());
 }
 

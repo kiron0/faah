@@ -223,6 +223,21 @@ export function isValidQuietHoursTime(value: string): boolean {
   return quietHoursTimeRegex.test(value);
 }
 
+export function findInvalidPatterns(settings: {
+  patterns: readonly string[];
+  excludePatterns: readonly string[];
+}): string[] {
+  const invalid: string[] = [];
+  for (const pattern of [...settings.patterns, ...settings.excludePatterns]) {
+    try {
+      new RegExp(pattern, "i");
+    } catch {
+      invalid.push(pattern);
+    }
+  }
+  return invalid;
+}
+
 function normalizeQuietHoursTime(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback;
   const normalized = value.trim();

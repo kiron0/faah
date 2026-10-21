@@ -49,6 +49,7 @@ import { handleZshFixCommand } from "./zsh-fix";
 
 const editorDiagnosticsTypingDebounceMs = 300;
 const statusRefreshIntervalMs = 15_000;
+const configurationReloadDebounceMs = 60;
 const onboardingStateKey = "faah.onboarding.seenVersion";
 
 type SnoozeAction = {
@@ -77,12 +78,25 @@ function getVscodeExport<K extends keyof typeof vscode>(
   return vscode[key];
 }
 
+function sameStringArrays(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   let storedSettings = loadStoredSettings(context);
   let settings = toRuntimeSettings(storedSettings);
   let soundPath = resolveSoundPath(context, storedSettings);
   let editorTypingDebounceTimer: ReturnType<typeof setTimeout> | undefined;
   let statusRefreshTimer: ReturnType<typeof setInterval> | undefined;
+  let configurationReloadTimer: ReturnType<typeof setTimeout> | undefined;
+  let settingsWriteInFlight = false;
+  let pendingConfigurationReload = false;
+  let pendingTerminalStateReset = false;
+  let pendingDiagnosticsStateReset = false;
   const { item: statusBarItem, update: updateStatusBar } =
     createStatusBarController();
   const terminalMonitoringCapability = getTerminalMonitoringCapability();
@@ -174,11 +188,21 @@ export function activate(context: vscode.ExtensionContext): void {
     storedSettings = normalizeStoredSettings(nextSettings);
     settings = toRuntimeSettings(storedSettings);
     refreshSoundPath();
-    const persistResult = await persistStoredSettings(
-      context,
-      storedSettings,
-      persistTarget,
-    );
+    settingsWriteInFlight = true;
+    let persistResult: PersistStoredSettingsResult | undefined;
+    try {
+      persistResult = await persistStoredSettings(
+        context,
+        storedSettings,
+        persistTarget,
+      );
+    } finally {
+      settingsWriteInFlight = false;
+      if (pendingConfigurationReload) {
+        pendingConfigurationReload = false;
+        scheduleConfigurationReload();
+      }
+    }
     if (!settings.enabled || !settings.monitorDiagnostics) {
       clearEditorTypingDebounce();
     }
@@ -192,6 +216,69 @@ export function activate(context: vscode.ExtensionContext): void {
     refreshSoundPath();
     syncStatusBar();
   };
+
+  const clearConfigurationReloadTimer = (): void => {
+    if (!configurationReloadTimer) return;
+    clearTimeout(configurationReloadTimer);
+    configurationReloadTimer = undefined;
+  };
+
+  const flushPendingConfigurationChanges = (): void => {
+    configurationReloadTimer = undefined;
+    const previousStoredSettings = storedSettings;
+    reloadSettingsFromConfiguration();
+    const nextStoredSettings = storedSettings;
+
+    const patternsChanged =
+      !sameStringArrays(
+        previousStoredSettings.patterns,
+        nextStoredSettings.patterns,
+      ) ||
+      !sameStringArrays(
+        previousStoredSettings.excludePatterns,
+        nextStoredSettings.excludePatterns,
+      );
+    const terminalStateChanged =
+      previousStoredSettings.enabled !== nextStoredSettings.enabled ||
+      previousStoredSettings.monitorTerminal !==
+        nextStoredSettings.monitorTerminal ||
+      previousStoredSettings.terminalDetectionMode !==
+        nextStoredSettings.terminalDetectionMode ||
+      previousStoredSettings.patternMode !== nextStoredSettings.patternMode ||
+      patternsChanged;
+    const diagnosticsStateChanged =
+      previousStoredSettings.enabled !== nextStoredSettings.enabled ||
+      previousStoredSettings.monitorDiagnostics !==
+        nextStoredSettings.monitorDiagnostics ||
+      previousStoredSettings.diagnosticsSeverity !==
+        nextStoredSettings.diagnosticsSeverity ||
+      previousStoredSettings.patternMode !== nextStoredSettings.patternMode ||
+      patternsChanged;
+
+    if (pendingTerminalStateReset && terminalStateChanged) {
+      resetExecutionMonitorState();
+    }
+    if (pendingDiagnosticsStateReset && diagnosticsStateChanged) {
+      clearDiagnosticsRetryTimers();
+      if (settings.enabled && settings.monitorDiagnostics) {
+        scanActiveEditorDiagnostics(
+          () => settings,
+          () => soundPath,
+        );
+      }
+    }
+    pendingTerminalStateReset = false;
+    pendingDiagnosticsStateReset = false;
+  };
+
+  const scheduleConfigurationReload = (): void => {
+    if (configurationReloadTimer) clearTimeout(configurationReloadTimer);
+    configurationReloadTimer = setTimeout(
+      flushPendingConfigurationChanges,
+      configurationReloadDebounceMs,
+    );
+  };
+
   syncStatusBar();
   prewarmAudioBackend(soundPath);
 
@@ -730,19 +817,16 @@ export function activate(context: vscode.ExtensionContext): void {
         event.affectsConfiguration("faah.excludePresetIds") ||
         event.affectsConfiguration("faah.patterns") ||
         event.affectsConfiguration("faah.excludePatterns");
-      reloadSettingsFromConfiguration();
-      if (terminalStateAffects) {
-        resetExecutionMonitorState();
+
+      if (diagnosticsStateAffects) pendingDiagnosticsStateReset = true;
+      if (terminalStateAffects) pendingTerminalStateReset = true;
+
+      if (settingsWriteInFlight) {
+        pendingConfigurationReload = true;
+        return;
       }
-      if (diagnosticsStateAffects) {
-        clearDiagnosticsRetryTimers();
-        if (settings.enabled && settings.monitorDiagnostics) {
-          scanActiveEditorDiagnostics(
-            () => settings,
-            () => soundPath,
-          );
-        }
-      }
+
+      scheduleConfigurationReload();
     },
   );
 
@@ -767,6 +851,7 @@ export function activate(context: vscode.ExtensionContext): void {
     copyZshFixDisposable,
     { dispose: clearEditorTypingDebounce },
     { dispose: clearStatusRefreshTimer },
+    { dispose: clearConfigurationReloadTimer },
     { dispose: disposeDiagnosticsMonitorState },
     statusBarItem,
   );

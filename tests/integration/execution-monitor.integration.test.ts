@@ -285,6 +285,16 @@ describe("execution monitor integration tests", () => {
     expect(playAlert).not.toHaveBeenCalled();
   });
 
+  it("does not alert when monitoring is disabled in tryPlayForExecution", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution([]) as any;
+    const settings = createSettings({ enabled: false });
+
+    executionMonitor.tryPlayForExecution(execution, settings, "media/faah.wav");
+
+    expect(playAlert).not.toHaveBeenCalled();
+  });
+
   it("ignores empty chunks and whitespace-only chunks", async () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
     const execution = createExecution(["", "   ", "\n", "\r\n"]) as any;

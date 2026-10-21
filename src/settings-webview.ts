@@ -7,6 +7,7 @@ import {
   createPresetSettings,
   defaultStoredSettings,
   excludePatternPresetDefinitions,
+  findInvalidPatterns,
   type PersistStoredSettingsResult,
   normalizeStoredSettings,
   type SettingsPersistTarget,
@@ -1507,7 +1508,7 @@ fi</div>
       const payload = explicitPayload || collectSettings();
       const signature = createSettingsSignature(payload);
 
-      if (!force && invalidRegexCount > 0) {
+      if (invalidRegexCount > 0 && !explicitPayload) {
         flashPill("Fix invalid regex entries to resume auto-save.", "error");
         return false;
       }
@@ -2012,6 +2013,14 @@ export function registerSettingsUiCommand(
             const fileContents = await fs.readFile(selectedPath, "utf8");
             const parsed = JSON.parse(fileContents) as Partial<StoredSettings>;
             const normalized = normalizeStoredSettings(parsed);
+            const invalidPatterns = findInvalidPatterns(normalized);
+            if (invalidPatterns.length > 0) {
+              panel?.webview.postMessage({
+                type: "error",
+                payload: `Imported settings contain ${invalidPatterns.length} invalid regular expression(s). Fix them before importing.`,
+              });
+              return;
+            }
             const persistTarget = getPersistTargetFromMessage(message.target);
             const savedResult = await onSaved(normalized, persistTarget);
             await rememberSaveTarget(context, persistTarget);
@@ -2038,6 +2047,14 @@ export function registerSettingsUiCommand(
           const normalized = normalizeStoredSettings(
             (message.payload ?? {}) as Partial<StoredSettings>,
           );
+          const invalidPatterns = findInvalidPatterns(normalized);
+          if (invalidPatterns.length > 0) {
+            panel?.webview.postMessage({
+              type: "error",
+              payload: `Settings contain ${invalidPatterns.length} invalid regular expression(s). Fix them before saving.`,
+            });
+            return;
+          }
           const persistTarget = getPersistTargetFromMessage(message.target);
           const savedResult = await onSaved(normalized, persistTarget);
           await rememberSaveTarget(context, persistTarget);

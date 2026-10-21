@@ -302,7 +302,7 @@ describe("extension smoke tests", () => {
     const textDocumentHandler = harness.getTextDocumentHandler();
     const diagnosticsHandler = harness.getDiagnosticsHandler();
 
-    expect(harness.context.subscriptions).toHaveLength(18);
+    expect(harness.context.subscriptions).toHaveLength(19);
     expect(startHandler).toBeTypeOf("function");
     expect(endHandler).toBeTypeOf("function");
     expect(activeEditorHandler).toBeTypeOf("function");
@@ -370,7 +370,7 @@ describe("extension smoke tests", () => {
     const textDocumentHandler = harness.getTextDocumentHandler();
     const diagnosticsHandler = harness.getDiagnosticsHandler();
 
-    expect(harness.context.subscriptions).toHaveLength(16);
+    expect(harness.context.subscriptions).toHaveLength(17);
     expect(harness.getStartHandler()).toBeUndefined();
     expect(harness.getEndHandler()).toBeUndefined();
     expect(activeEditorHandler).toBeTypeOf("function");
