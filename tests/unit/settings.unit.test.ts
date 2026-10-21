@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-async function loadSettingsModuleWithVscode(vscodeMock: Record<string, unknown>) {
+async function loadSettingsModuleWithVscode(
+  vscodeMock: Record<string, unknown>,
+) {
   vi.resetModules();
   vi.doMock("vscode", () => vscodeMock);
   return import("../../src/settings");
