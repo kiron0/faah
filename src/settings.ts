@@ -243,6 +243,16 @@ function readConfigurationOverride<T>(
   return undefined;
 }
 
+function configurationValuesEqual(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return (
+      left.length === right.length &&
+      left.every((value, index) => value === right[index])
+    );
+  }
+  return left === right;
+}
+
 function updateConfigurationValue<T>(
   config: vscode.WorkspaceConfiguration,
   key: string,
@@ -251,15 +261,23 @@ function updateConfigurationValue<T>(
   skippedConfigurationKeys: string[],
 ): Promise<void> | undefined {
   const inspect = config.inspect;
-  if (
-    typeof inspect === "function" &&
-    inspect.call(config, key) === undefined
-  ) {
-    console.warn(
-      `[faah] Skipping update for unregistered configuration: ${configurationSection}.${key}`,
-    );
-    skippedConfigurationKeys.push(`${configurationSection}.${key}`);
-    return undefined;
+  if (typeof inspect === "function") {
+    const inspected = inspect.call(config, key);
+    if (inspected === undefined) {
+      console.warn(
+        `[faah] Skipping update for unregistered configuration: ${configurationSection}.${key}`,
+      );
+      skippedConfigurationKeys.push(`${configurationSection}.${key}`);
+      return undefined;
+    }
+
+    const currentValue =
+      target === vscode.ConfigurationTarget.Workspace
+        ? inspected.workspaceValue
+        : inspected.globalValue;
+    if (configurationValuesEqual(currentValue, value)) {
+      return undefined;
+    }
   }
 
   return Promise.resolve(config.update(key, value, target)).catch((err) => {

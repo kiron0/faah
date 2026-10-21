@@ -153,7 +153,9 @@ describe("audio unit tests", () => {
     expect(call[1]).toMatchObject({
       afplay: ["-v", 0.4],
       mplayer: ["-volume", 40],
-      play: ["vol", 0.4],
+      play: ["-v", 0.4],
+      paplay: ["--volume=26214"],
+      mpv: ["--no-video", "--volume=40"],
     });
     expect(mocks.playSoundFactory).toHaveBeenCalledWith({
       players: expect.arrayContaining([

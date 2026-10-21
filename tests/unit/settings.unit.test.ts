@@ -184,6 +184,39 @@ describe("settings unit tests", () => {
     expect(globalStateUpdate).toHaveBeenCalledTimes(1);
   });
 
+  it("skips configuration writes when the target value is already stored", async () => {
+    const configUpdate = vi.fn().mockResolvedValue(undefined);
+    const globalStateUpdate = vi.fn().mockResolvedValue(undefined);
+    const settings = await loadSettingsModuleWithVscode({
+      workspace: {
+        workspaceFolders: [{ uri: { fsPath: "/tmp/workspace" } }],
+        getConfiguration: vi.fn(() => ({
+          inspect: vi.fn((key: string) => ({
+            key,
+            globalValue:
+              settings.defaultStoredSettings[
+                key as keyof typeof settings.defaultStoredSettings
+              ],
+          })),
+          update: configUpdate,
+        })),
+      },
+      ConfigurationTarget: {
+        Global: "global",
+        Workspace: "workspace",
+      },
+    });
+
+    const result = await settings.persistStoredSettings(
+      { globalState: { update: globalStateUpdate } } as any,
+      settings.defaultStoredSettings,
+    );
+
+    expect(configUpdate).not.toHaveBeenCalled();
+    expect(globalStateUpdate).toHaveBeenCalledTimes(1);
+    expect(result.skippedConfigurationKeys).toEqual([]);
+  });
+
   it("persists to workspace settings only when workspace target is explicitly requested", async () => {
     const configUpdate = vi.fn().mockResolvedValue(undefined);
     const settings = await loadSettingsModuleWithVscode({

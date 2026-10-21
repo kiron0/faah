@@ -1148,6 +1148,7 @@ fi</div>
     let saveInFlight = false;
     let queuedSave = false;
     let latestSavedSignature = "";
+    let inFlightPayloadSignature = "";
 
     function setSwitchState(element, isOn) {
       element.classList.toggle("on", isOn);
@@ -1170,6 +1171,16 @@ fi</div>
       ui.customSoundPathDisplay.textContent = customSoundPath;
     }
 
+    function setRangeValue(element, value, fallback) {
+      const numeric =
+        typeof value === "number" && Number.isFinite(value) ? value : fallback;
+      const minimum = Number(element.min) || 0;
+      const nextValue = Math.max(minimum, numeric);
+      element.max = String(Math.max(Number(element.max) || nextValue, nextValue));
+      element.step = nextValue % 100 === 0 ? "100" : "1";
+      element.value = String(nextValue);
+    }
+
     function applySettings(settings) {
       enabled = !!settings.enabled;
       monitorTerminal = !!settings.monitorTerminal;
@@ -1187,11 +1198,15 @@ fi</div>
         settings.terminalDetectionMode === "output" || settings.terminalDetectionMode === "exitCode"
           ? settings.terminalDetectionMode
           : "either";
-      ui.terminalCooldownMs.value = String(
-        Math.max(500, settings.terminalCooldownMs ?? settings.cooldownMs ?? 1500),
+      setRangeValue(
+        ui.terminalCooldownMs,
+        settings.terminalCooldownMs ?? settings.cooldownMs,
+        1500,
       );
-      ui.diagnosticsCooldownMs.value = String(
-        Math.max(500, settings.diagnosticsCooldownMs ?? settings.cooldownMs ?? 1500),
+      setRangeValue(
+        ui.diagnosticsCooldownMs,
+        settings.diagnosticsCooldownMs ?? settings.cooldownMs,
+        1500,
       );
       ui.volumePercent.value = String(settings.volumePercent ?? 70);
       customSoundPath = typeof settings.customSoundPath === "string" ? settings.customSoundPath : "";
@@ -1504,6 +1519,7 @@ fi</div>
       }
 
       saveInFlight = true;
+      inFlightPayloadSignature = signature;
       vscode.postMessage({ type: "save", payload, target: getPersistTarget() });
       return true;
     }
@@ -1694,8 +1710,13 @@ fi</div>
       if (message.type === "saved") {
         saveInFlight = false;
         const savedSettings = message.payload || initial;
+        const currentSignature = createSettingsSignature(collectSettings());
+        const shouldApplySettings =
+          !inFlightPayloadSignature ||
+          currentSignature === inFlightPayloadSignature;
+        inFlightPayloadSignature = "";
         latestSavedSignature = createSettingsSignature(savedSettings);
-        applySettings(savedSettings);
+        if (shouldApplySettings) applySettings(savedSettings);
         syncSaveTarget(message.target);
         const targetLabel = message.target === "workspace" ? "workspace" : "user";
         const warningText = formatSkippedConfigurationWarning(
@@ -1731,7 +1752,11 @@ fi</div>
 
       if (message.type === "externalSettingsUpdated") {
         const externalSettings = message.payload || initial;
-        latestSavedSignature = createSettingsSignature(externalSettings);
+        const currentSignature = createSettingsSignature(collectSettings());
+        if (saveInFlight || currentSignature !== latestSavedSignature) return;
+        const externalSignature = createSettingsSignature(externalSettings);
+        latestSavedSignature = externalSignature;
+        if (externalSignature === currentSignature) return;
         applySettings(externalSettings);
         return;
       }
@@ -1743,6 +1768,7 @@ fi</div>
 
       if (message.type === "error") {
         saveInFlight = false;
+        inFlightPayloadSignature = "";
         queuedSave = false;
         flashStatus(String(message.payload || "Failed to save settings"), "error");
       }
