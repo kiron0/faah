@@ -84,6 +84,7 @@ describe("extension save order regression", () => {
 
     vi.doMock("../../src/settings-webview", () => ({
       registerSettingsUiCommand,
+      notifySettingsPanelUpdated: vi.fn(),
     }));
 
     vi.doMock("../../src/settings", () => ({
@@ -220,6 +221,7 @@ describe("extension save order regression", () => {
 
     vi.doMock("../../src/settings-webview", () => ({
       registerSettingsUiCommand,
+      notifySettingsPanelUpdated: vi.fn(),
     }));
 
     vi.doMock("../../src/settings", () => ({

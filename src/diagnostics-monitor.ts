@@ -10,7 +10,6 @@ import type { RuntimeSettings } from "./settings";
 
 const lastFingerprintByUri = new Map<string, string>();
 const retryTimerByUri = new Map<string, ReturnType<typeof setTimeout>>();
-const FINGERPRINT_LINE_SEPARATOR = "\n";
 const MAX_TRACKED_FINGERPRINTS = 256;
 
 function normalizeDiagnosticCode(code: vscode.Diagnostic["code"]): string {
@@ -46,6 +45,15 @@ function serializeDiagnostic(diagnostic: vscode.Diagnostic): string {
   return `${source}|${code}|${line}|${diagnostic.message}`;
 }
 
+function hashString(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
 function createMonitoredDiagnosticsFingerprint(
   uri: vscode.Uri,
   settings: RuntimeSettings,
@@ -65,10 +73,11 @@ function createMonitoredDiagnosticsFingerprint(
 
   if (monitoredDiagnostics.length === 0) return null;
 
-  return monitoredDiagnostics
-    .map(serializeDiagnostic)
-    .sort()
-    .join(FINGERPRINT_LINE_SEPARATOR);
+  const parts = monitoredDiagnostics
+    .map((diagnostic) => hashString(serializeDiagnostic(diagnostic)))
+    .sort();
+
+  return hashString(parts.join(","));
 }
 
 function clearRetry(uriKey: string): void {
@@ -119,6 +128,16 @@ function tryPlayForEditor(
 
   const uri = editor.document.uri;
   const uriKey = uri.toString();
+
+  const remainingCooldownMs = getRemainingPlaybackCooldownMs(
+    settings.diagnosticsCooldownMs,
+    "diagnostics",
+  );
+  if (remainingCooldownMs > 0) {
+    scheduleRetry(uriKey, remainingCooldownMs + 30, getSettings, getSoundPath);
+    return;
+  }
+
   const nextFingerprint = createMonitoredDiagnosticsFingerprint(uri, settings);
   const previousFingerprint = lastFingerprintByUri.get(uriKey) ?? null;
 
@@ -133,14 +152,6 @@ function tryPlayForEditor(
     return;
   }
 
-  const remainingCooldownMs = getRemainingPlaybackCooldownMs(
-    settings.diagnosticsCooldownMs,
-    "diagnostics",
-  );
-  if (remainingCooldownMs > 0) {
-    scheduleRetry(uriKey, remainingCooldownMs + 30, getSettings, getSoundPath);
-    return;
-  }
   if (
     !tryAcquirePlaybackWindow(settings.diagnosticsCooldownMs, "diagnostics")
   ) {

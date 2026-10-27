@@ -36,6 +36,7 @@ import {
 import {
   registerSettingsUiCommand,
   saveTargetStorageKey,
+  notifySettingsPanelUpdated,
 } from "./settings-webview";
 import { createStatusBarController } from "./status-bar";
 import {
@@ -116,6 +117,7 @@ export function activate(context: vscode.ExtensionContext): void {
   let pendingConfigurationReload = false;
   let pendingTerminalStateReset = false;
   let pendingDiagnosticsStateReset = false;
+  let skippedConfigurationKeys: string[] = [];
   const { item: statusBarItem, update: updateStatusBar } =
     createStatusBarController();
   const terminalMonitoringCapability = getTerminalMonitoringCapability();
@@ -175,8 +177,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
     if (snoozeRemainingMs > 0 && !statusRefreshTimer) {
       statusRefreshTimer = setInterval(() => {
+        const remainingMs = getSnoozeRemainingMs();
+        if (remainingMs <= 0) {
+          clearStatusRefreshTimer();
+          updateStatusBar(settings, {
+            snoozeRemainingMs: 0,
+            terminalMonitoringCapability,
+          });
+          return;
+        }
         updateStatusBar(settings, {
-          snoozeRemainingMs: getSnoozeRemainingMs(),
+          snoozeRemainingMs: remainingMs,
           terminalMonitoringCapability,
         });
       }, statusRefreshIntervalMs);
@@ -222,6 +233,7 @@ export function activate(context: vscode.ExtensionContext): void {
         scheduleConfigurationReload();
       }
     }
+    skippedConfigurationKeys = persistResult?.skippedConfigurationKeys ?? [];
     if (!settings.enabled || !settings.monitorDiagnostics) {
       clearEditorTypingDebounce();
     }
@@ -230,10 +242,11 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   const reloadSettingsFromConfiguration = (): void => {
-    storedSettings = loadStoredSettings(context);
+    storedSettings = loadStoredSettings(context, skippedConfigurationKeys);
     settings = toRuntimeSettings(storedSettings);
     refreshSoundPath();
     syncStatusBar();
+    notifySettingsPanelUpdated(storedSettings);
   };
 
   const clearConfigurationReloadTimer = (): void => {
@@ -247,6 +260,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const previousStoredSettings = storedSettings;
     reloadSettingsFromConfiguration();
     const nextStoredSettings = storedSettings;
+    skippedConfigurationKeys = [];
 
     const patternsChanged =
       !sameStringArrays(
@@ -452,7 +466,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (selected.label === clearLabel) {
         clearSnoozeAlerts();
         syncStatusBar();
-        vscode.window.showInformationMessage("Faah snooze cleared.");
+        void vscode.window.showInformationMessage("Faah snooze cleared.");
         return;
       }
 
@@ -465,7 +479,7 @@ export function activate(context: vscode.ExtensionContext): void {
         chosenAction.durationMinutes * 60_000,
       );
       syncStatusBar();
-      vscode.window.showInformationMessage(
+      void vscode.window.showInformationMessage(
         `Faah alerts snoozed for ${chosenAction.label} (until ${formatTime(snoozeUntil)}).`,
       );
     },
@@ -476,7 +490,7 @@ export function activate(context: vscode.ExtensionContext): void {
     () => {
       clearSnoozeAlerts();
       syncStatusBar();
-      vscode.window.showInformationMessage("Faah snooze cleared.");
+      void vscode.window.showInformationMessage("Faah snooze cleared.");
     },
   );
 
@@ -515,7 +529,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       if (selected.action === "disable") {
         await patchSettings({ quietHoursEnabled: false });
-        vscode.window.showInformationMessage("Faah quiet hours disabled.");
+        void vscode.window.showInformationMessage("Faah quiet hours disabled.");
         return;
       }
 
@@ -525,7 +539,7 @@ export function activate(context: vscode.ExtensionContext): void {
           quietHoursStart: "22:00",
           quietHoursEnd: "07:00",
         });
-        vscode.window.showInformationMessage(
+        void vscode.window.showInformationMessage(
           "Faah quiet hours set to 22:00 - 07:00.",
         );
         return;
@@ -537,7 +551,7 @@ export function activate(context: vscode.ExtensionContext): void {
           quietHoursStart: "00:00",
           quietHoursEnd: "06:00",
         });
-        vscode.window.showInformationMessage(
+        void vscode.window.showInformationMessage(
           "Faah quiet hours set to 00:00 - 06:00.",
         );
         return;
@@ -570,7 +584,7 @@ export function activate(context: vscode.ExtensionContext): void {
         quietHoursStart: start.trim(),
         quietHoursEnd: end.trim(),
       });
-      vscode.window.showInformationMessage(
+      void vscode.window.showInformationMessage(
         `Faah quiet hours set to ${start.trim()} - ${end.trim()}.`,
       );
     },
@@ -699,7 +713,7 @@ export function activate(context: vscode.ExtensionContext): void {
           break;
         case "toggleTerminal":
           if (!terminalMonitoringSupported) {
-            vscode.window.showInformationMessage(
+            void vscode.window.showInformationMessage(
               "Faah terminal monitoring is unavailable in this editor version.",
             );
             break;

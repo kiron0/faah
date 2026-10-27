@@ -241,6 +241,7 @@ async function loadExtensionHarness(
   }));
   vi.doMock("../../src/settings-webview", () => ({
     registerSettingsUiCommand,
+    notifySettingsPanelUpdated: vi.fn(),
   }));
   vi.doMock("../../src/settings", () => ({
     loadStoredSettings,

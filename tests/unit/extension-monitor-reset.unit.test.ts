@@ -96,6 +96,7 @@ describe("extension monitor reset regression", () => {
     }));
 
     vi.doMock("../../src/settings-webview", () => ({
+      notifySettingsPanelUpdated: vi.fn(),
       registerSettingsUiCommand: vi.fn(() => ({ dispose: vi.fn() })),
     }));
     vi.doMock("../../src/settings", () => ({

@@ -27,11 +27,22 @@ function getNonce(): string {
 }
 
 export const saveTargetStorageKey = "faah.settings.saveTarget.v1";
+const maxImportFileBytes = 1024 * 1024;
 const validPresetIds = new Set<SettingsPresetId>([
   "balanced",
   "quiet",
   "aggressive",
 ]);
+
+let activeSettingsPanel: vscode.WebviewPanel | undefined;
+
+export function notifySettingsPanelUpdated(settings: StoredSettings): void {
+  if (!activeSettingsPanel) return;
+  void activeSettingsPanel.webview.postMessage({
+    type: "externalSettingsUpdated",
+    payload: settings,
+  });
+}
 
 function normalizeSaveTarget(
   value: unknown,
@@ -1075,6 +1086,8 @@ function renderSettingsWebview(
 
     const autoSaveDebounceMs = 450;
     const textAutoSaveDebounceMs = 900;
+    const rangeAutoSaveDebounceMs = 1200;
+    const regexValidationDebounceMs = 250;
     const defaultPillMessage = "Settings auto-save instantly to keep everything in sync.";
     let enabled = true;
     let monitorTerminal = true;
@@ -1086,6 +1099,7 @@ function renderSettingsWebview(
     let statusTimer = null;
     let pillTimer = null;
     let autoSaveTimer = null;
+    let regexValidationTimer = null;
     let saveInFlight = false;
     let queuedSave = false;
     let latestSavedSignature = "";
@@ -1117,8 +1131,6 @@ function renderSettingsWebview(
         typeof value === "number" && Number.isFinite(value) ? value : fallback;
       const minimum = Number(element.min) || 0;
       const nextValue = Math.max(minimum, numeric);
-      element.max = String(Math.max(Number(element.max) || nextValue, nextValue));
-      element.step = nextValue % 100 === 0 ? "100" : "1";
       element.value = String(nextValue);
     }
 
@@ -1315,6 +1327,14 @@ function renderSettingsWebview(
 
       renderValidationList(ui.invalidPatternList, "Pattern", invalidPatterns);
       renderValidationList(ui.invalidExcludePatternList, "Exclude", invalidExcludePatterns);
+    }
+
+    function scheduleRegexValidation() {
+      if (regexValidationTimer) clearTimeout(regexValidationTimer);
+      regexValidationTimer = setTimeout(() => {
+        regexValidationTimer = null;
+        syncRegexValidation();
+      }, regexValidationDebounceMs);
     }
 
     function collectSettings() {
@@ -1532,15 +1552,15 @@ function renderSettingsWebview(
 
     ui.volumePercent.addEventListener("input", () => {
       syncVolumeLabel();
-      markChanged();
+      markChanged(rangeAutoSaveDebounceMs);
     });
     ui.terminalCooldownMs.addEventListener("input", () => {
       syncTerminalCooldownLabel();
-      markChanged();
+      markChanged(rangeAutoSaveDebounceMs);
     });
     ui.diagnosticsCooldownMs.addEventListener("input", () => {
       syncDiagnosticsCooldownLabel();
-      markChanged();
+      markChanged(rangeAutoSaveDebounceMs);
     });
     ui.diagnosticsSeverity.addEventListener("change", () => {
       markChanged();
@@ -1559,11 +1579,11 @@ function renderSettingsWebview(
       markChanged();
     });
     ui.patterns.addEventListener("input", () => {
-      syncRegexValidation();
+      scheduleRegexValidation();
       markChanged(textAutoSaveDebounceMs);
     });
     ui.excludePatterns.addEventListener("input", () => {
-      syncRegexValidation();
+      scheduleRegexValidation();
       markChanged(textAutoSaveDebounceMs);
     });
     ui.excludePresetOptions.addEventListener("change", () => {
@@ -1782,6 +1802,8 @@ export function registerSettingsUiCommand(
           retainContextWhenHidden: true,
         },
       );
+      const panelRef = panel;
+      activeSettingsPanel = panelRef;
       const panelIconPath = vscode.Uri.joinPath(
         context.extensionUri,
         "images",
@@ -1796,6 +1818,7 @@ export function registerSettingsUiCommand(
 
       panel.onDidDispose(() => {
         panel = undefined;
+        if (activeSettingsPanel === panelRef) activeSettingsPanel = undefined;
       });
 
       panel.webview.onDidReceiveMessage(async (message) => {
@@ -1922,6 +1945,27 @@ export function registerSettingsUiCommand(
             });
             const selectedPath = selected?.[0]?.fsPath;
             if (!selectedPath) return;
+
+            const fileStat = await fs.stat(selectedPath).catch(() => null);
+            if (!fileStat || !fileStat.isFile()) {
+              panel?.webview.postMessage({
+                type: "error",
+                payload: "Selected settings file could not be read.",
+              });
+              return;
+            }
+            if (fileStat.size > maxImportFileBytes) {
+              panel?.webview.postMessage({
+                type: "error",
+                payload:
+                  "Settings file is too large (" +
+                  String(Math.round(fileStat.size / 1024)) +
+                  " KB). Maximum is " +
+                  String(Math.round(maxImportFileBytes / 1024)) +
+                  " KB.",
+              });
+              return;
+            }
 
             const fileContents = await fs.readFile(selectedPath, "utf8");
             const parsed = JSON.parse(fileContents) as Partial<StoredSettings>;

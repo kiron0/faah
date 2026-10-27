@@ -153,7 +153,8 @@ describe("audio unit tests", () => {
     expect(call[1]).toMatchObject({
       afplay: ["-v", 0.4],
       mplayer: ["-volume", 40],
-      play: ["-v", 0.4],
+      // SOX `play -v` takes a percentage, afplay takes a 0..1 factor.
+      play: ["-v", 40],
       paplay: ["--volume=26214"],
       mpv: ["--no-video", "--volume=40"],
     });

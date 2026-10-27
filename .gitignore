@@ -28,6 +28,12 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# Local agent/search configuration
+.claude/
+.codex/
+.mcp.json
+.xerj-data/
+
 # OS/editor noise
 .DS_Store
 Thumbs.db

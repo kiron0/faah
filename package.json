@@ -1,11 +1,15 @@
 {
   "name": "faah",
+  "private": true,
+  "packageManager": "bun@1.3.9",
   "displayName": "Faah - Error Alerts",
   "description": "Instant drama the second your code breaks. Audio alerts for terminal errors and editor diagnostics.",
   "icon": "images/icon.png",
   "version": "0.2.5",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
+  "license": "MIT",
+  "pricing": "Free",
   "repository": {
     "type": "git",
     "url": "https://github.com/kiron0/faah"
@@ -266,7 +270,7 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "compile": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\" && tsc -p ./",
     "build": "npm run package",
     "lint": "tsc --noEmit -p ./",
     "watch": "tsc -w -p ./",
@@ -289,6 +293,7 @@
     "@types/play-sound": "^1.1.2",
     "@types/vscode": "~1.105.0",
     "@vscode/vsce": "^4.0.0",
+    "ovsx": "^1.3.0",
     "prettier": "^3.9.10",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"

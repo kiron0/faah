@@ -247,7 +247,10 @@ function normalizeQuietHoursTime(value: unknown, fallback: string): string {
 function readConfigurationOverride<T>(
   config: vscode.WorkspaceConfiguration,
   key: string,
+  ignoredKeys: readonly string[] = [],
 ): T | undefined {
+  if (ignoredKeys.includes(key)) return undefined;
+
   const inspected = config.inspect<T>(key);
   if (!inspected) return undefined;
 
@@ -469,6 +472,7 @@ export function toRuntimeSettings(stored: StoredSettings): RuntimeSettings {
 
 export function loadStoredSettings(
   context: vscode.ExtensionContext,
+  ignoredConfigurationKeys: readonly string[] = [],
 ): StoredSettings {
   const legacySaved =
     context.globalState.get<Partial<StoredSettings>>(settingsStorageKey);
@@ -476,12 +480,17 @@ export function loadStoredSettings(
 
   const configOverrides: Partial<StoredSettings> = {};
 
-  const enabled = readConfigurationOverride<boolean>(config, "enabled");
+  const enabled = readConfigurationOverride<boolean>(
+    config,
+    "enabled",
+    ignoredConfigurationKeys,
+  );
   if (enabled !== undefined) configOverrides.enabled = enabled;
 
   const monitorTerminal = readConfigurationOverride<boolean>(
     config,
     "monitorTerminal",
+    ignoredConfigurationKeys,
   );
   if (monitorTerminal !== undefined)
     configOverrides.monitorTerminal = monitorTerminal;
@@ -489,6 +498,7 @@ export function loadStoredSettings(
   const monitorDiagnostics = readConfigurationOverride<boolean>(
     config,
     "monitorDiagnostics",
+    ignoredConfigurationKeys,
   );
   if (monitorDiagnostics !== undefined)
     configOverrides.monitorDiagnostics = monitorDiagnostics;
@@ -497,6 +507,7 @@ export function loadStoredSettings(
     readConfigurationOverride<DiagnosticsSeverityMode>(
       config,
       "diagnosticsSeverity",
+      ignoredConfigurationKeys,
     );
   if (diagnosticsSeverity !== undefined)
     configOverrides.diagnosticsSeverity = diagnosticsSeverity;
@@ -504,22 +515,29 @@ export function loadStoredSettings(
     readConfigurationOverride<TerminalDetectionMode>(
       config,
       "terminalDetectionMode",
+      ignoredConfigurationKeys,
     );
   if (terminalDetectionMode !== undefined) {
     configOverrides.terminalDetectionMode = terminalDetectionMode;
   }
 
-  const cooldownMs = readConfigurationOverride<number>(config, "cooldownMs");
+  const cooldownMs = readConfigurationOverride<number>(
+    config,
+    "cooldownMs",
+    ignoredConfigurationKeys,
+  );
   if (cooldownMs !== undefined) configOverrides.cooldownMs = cooldownMs;
   const terminalCooldownMs = readConfigurationOverride<number>(
     config,
     "terminalCooldownMs",
+    ignoredConfigurationKeys,
   );
   if (terminalCooldownMs !== undefined)
     configOverrides.terminalCooldownMs = terminalCooldownMs;
   const diagnosticsCooldownMs = readConfigurationOverride<number>(
     config,
     "diagnosticsCooldownMs",
+    ignoredConfigurationKeys,
   );
   if (diagnosticsCooldownMs !== undefined)
     configOverrides.diagnosticsCooldownMs = diagnosticsCooldownMs;
@@ -527,18 +545,21 @@ export function loadStoredSettings(
   const patternMode = readConfigurationOverride<PatternMode>(
     config,
     "patternMode",
+    ignoredConfigurationKeys,
   );
   if (patternMode !== undefined) configOverrides.patternMode = patternMode;
 
   const volumePercent = readConfigurationOverride<number>(
     config,
     "volumePercent",
+    ignoredConfigurationKeys,
   );
   if (volumePercent !== undefined)
     configOverrides.volumePercent = volumePercent;
   const showVisualNotifications = readConfigurationOverride<boolean>(
     config,
     "showVisualNotifications",
+    ignoredConfigurationKeys,
   );
   if (showVisualNotifications !== undefined) {
     configOverrides.showVisualNotifications = showVisualNotifications;
@@ -546,6 +567,7 @@ export function loadStoredSettings(
   const customSoundPath = readConfigurationOverride<string>(
     config,
     "customSoundPath",
+    ignoredConfigurationKeys,
   );
   if (customSoundPath !== undefined)
     configOverrides.customSoundPath = customSoundPath;
@@ -553,6 +575,7 @@ export function loadStoredSettings(
   const quietHoursEnabled = readConfigurationOverride<boolean>(
     config,
     "quietHoursEnabled",
+    ignoredConfigurationKeys,
   );
   if (quietHoursEnabled !== undefined)
     configOverrides.quietHoursEnabled = quietHoursEnabled;
@@ -560,6 +583,7 @@ export function loadStoredSettings(
   const quietHoursStart = readConfigurationOverride<string>(
     config,
     "quietHoursStart",
+    ignoredConfigurationKeys,
   );
   if (quietHoursStart !== undefined)
     configOverrides.quietHoursStart = quietHoursStart;
@@ -567,23 +591,30 @@ export function loadStoredSettings(
   const quietHoursEnd = readConfigurationOverride<string>(
     config,
     "quietHoursEnd",
+    ignoredConfigurationKeys,
   );
   if (quietHoursEnd !== undefined)
     configOverrides.quietHoursEnd = quietHoursEnd;
   const excludePresetIdsValue = readConfigurationOverride<ExcludePresetId[]>(
     config,
     "excludePresetIds",
+    ignoredConfigurationKeys,
   );
   if (excludePresetIdsValue !== undefined) {
     configOverrides.excludePresetIds = excludePresetIdsValue;
   }
 
-  const patterns = readConfigurationOverride<string[]>(config, "patterns");
+  const patterns = readConfigurationOverride<string[]>(
+    config,
+    "patterns",
+    ignoredConfigurationKeys,
+  );
   if (patterns !== undefined) configOverrides.patterns = patterns;
 
   const excludePatterns = readConfigurationOverride<string[]>(
     config,
     "excludePatterns",
+    ignoredConfigurationKeys,
   );
   if (excludePatterns !== undefined)
     configOverrides.excludePatterns = excludePatterns;
@@ -638,13 +669,6 @@ export async function persistStoredSettings(
       config,
       "terminalDetectionMode",
       settings.terminalDetectionMode,
-      configurationTarget,
-      skippedConfigurationKeys,
-    ),
-    updateConfigurationValue(
-      config,
-      "cooldownMs",
-      settings.cooldownMs,
       configurationTarget,
       skippedConfigurationKeys,
     ),

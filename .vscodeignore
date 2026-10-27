@@ -9,6 +9,11 @@ tsconfig.json
 vitest.config.*
 .github/**
 .agents/**
+.claude/**
+.codex/**
+.mcp.json
+.xerj-data/**
+AGENTS.md
 bun.lock
 .git/**
 .gitignore

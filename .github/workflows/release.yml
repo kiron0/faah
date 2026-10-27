@@ -3,134 +3,187 @@ name: Release
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "media/**"
+      - "images/**"
+      - "README.md"
+      - "LICENSE"
+      - "package.json"
+      - "bun.lock"
+      - ".vscodeignore"
+      - "tsconfig.json"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-main
   cancel-in-progress: false
 
 jobs:
-  release-if-missing:
+  release:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.3.9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
-
-      - name: Resolve release metadata
-        id: meta
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          NAME=$(node -p "require('./package.json').displayName || require('./package.json').name")
-          DESCRIPTION=$(node -p "require('./package.json').description || ''")
-          TAG="v$VERSION"
-          TITLE="$TAG"
-
-          {
-            echo "version=$VERSION"
-            echo "tag=$TAG"
-            echo "title=$TITLE"
-            echo "description<<EOF"
-            echo "$DESCRIPTION"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Check if release already exists
-        id: check_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          if gh release view "${{ steps.meta.outputs.tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Release already exists for ${{ steps.meta.outputs.tag }}."
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "Release does not exist for ${{ steps.meta.outputs.tag }}. Creating one."
-          fi
+          node-version: 22
 
       - name: Install dependencies
-        if: steps.check_release.outputs.exists == 'false'
         run: bun install --frozen-lockfile
 
       - name: Lint
-        if: steps.check_release.outputs.exists == 'false'
         run: bun run lint
 
       - name: Compile
-        if: steps.check_release.outputs.exists == 'false'
         run: bun run compile
 
       - name: Test
-        if: steps.check_release.outputs.exists == 'false'
         run: bun run test
 
-      - name: Package VSIX
-        if: steps.check_release.outputs.exists == 'false'
-        run: bun run package
-
-      - name: Ensure git tag exists
-        if: steps.check_release.outputs.exists == 'false'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Plan release
+        id: release
         shell: bash
         run: |
-          if git rev-parse "${{ steps.meta.outputs.tag }}" >/dev/null 2>&1; then
-            echo "Tag already exists locally."
+          PREVIOUS_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            RANGE="$PREVIOUS_TAG..HEAD"
+            BASE_VERSION="${PREVIOUS_TAG#v}"
+          else
+            RANGE="HEAD"
+            BASE_VERSION=$(node -p "require('./package.json').version")
+          fi
+
+          if [ "$(git rev-list --count "$RANGE")" -eq 0 ]; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if git ls-remote --tags origin "refs/tags/${{ steps.meta.outputs.tag }}" | grep -q "refs/tags/${{ steps.meta.outputs.tag }}"; then
-            echo "Tag already exists on origin. Fetching it locally."
-            git fetch origin "refs/tags/${{ steps.meta.outputs.tag }}:refs/tags/${{ steps.meta.outputs.tag }}"
-            exit 0
+          SUBJECTS=$(git log "$RANGE" --format='%s')
+          MESSAGES=$(git log "$RANGE" --format='%s%n%b')
+          BUMP=patch
+
+          if printf '%s\n' "$MESSAGES" | grep -Eq '(^|[[:space:]])BREAKING CHANGE:|^[[:alnum:]_-]+(\([^)]+\))?!:'; then
+            BUMP=major
+          elif printf '%s\n' "$SUBJECTS" | grep -Eq '^feat(\([^)]+\))?:'; then
+            BUMP=minor
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "${{ steps.meta.outputs.tag }}" "${{ github.sha }}"
-          git push origin "refs/tags/${{ steps.meta.outputs.tag }}"
+          NEXT_VERSION=$(node - "$BASE_VERSION" "$BUMP" <<'NODE'
+          const [major, minor, patch] = process.argv[2].split(".").map(Number);
+          const bump = process.argv[3];
+          if (![major, minor, patch].every(Number.isInteger)) {
+            throw new Error(`Invalid base version: ${process.argv[2]}`);
+          }
+          const next = bump === "major"
+            ? [major + 1, 0, 0]
+            : bump === "minor"
+              ? [major, minor + 1, 0]
+              : [major, minor, patch + 1];
+          process.stdout.write(next.join("."));
+          NODE
+          )
 
-      - name: Collect release context
-        if: steps.check_release.outputs.exists == 'false'
-        id: release_context
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          PREVIOUS_TAG=$(gh release list --repo "${{ github.repository }}" --exclude-drafts --exclude-pre-releases --limit 100 --json tagName --jq '.[0].tagName // ""')
+          node - "$NEXT_VERSION" <<'NODE'
+          const fs = require("node:fs");
+          const path = "package.json";
+          const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+          pkg.version = process.argv[2];
+          fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+          NODE
 
           {
+            echo "needed=true"
             echo "previous_tag=$PREVIOUS_TAG"
+            echo "version=$NEXT_VERSION"
+            echo "tag=v$NEXT_VERSION"
+            echo "bump=$BUMP"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Inspect package contents
+        if: steps.release.outputs.needed == 'true'
+        run: bun run list
+
+      - name: Package VSIX
+        if: steps.release.outputs.needed == 'true'
+        run: bun run package
+
+      - name: Resolve VSIX
+        if: steps.release.outputs.needed == 'true'
+        id: vsix
+        shell: bash
+        run: |
+          mapfile -t files < <(find . -maxdepth 1 -type f -name '*.vsix' -print)
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "Expected exactly one VSIX, found ${#files[@]}." >&2
+            exit 1
+          fi
+          echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to Visual Studio Marketplace
+        if: steps.release.outputs.needed == 'true'
+        run: >-
+          ./node_modules/.bin/vsce publish
+          --oidc
+          --skip-duplicate
+          --packagePath "${{ steps.vsix.outputs.path }}"
+
+      - name: Publish to Open VSX
+        if: steps.release.outputs.needed == 'true'
+        run: >-
+          ./node_modules/.bin/ovsx publish
+          "${{ steps.vsix.outputs.path }}"
+          --trusted-publishing
+          --skip-duplicate
+
+      - name: Commit release version
+        if: steps.release.outputs.needed == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): ${{ steps.release.outputs.tag }} [skip ci]"
+            git push origin HEAD:main
+          fi
+
+      - name: Create and push tag
+        if: steps.release.outputs.needed == 'true'
+        shell: bash
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/$TAG:refs/tags/$TAG"
+          else
+            git tag "$TAG" HEAD
+            git push origin "refs/tags/$TAG"
+          fi
+
       - name: Generate release notes
-        if: steps.check_release.outputs.exists == 'false'
+        if: steps.release.outputs.needed == 'true'
         shell: bash
         run: |
           REPO_URL="https://github.com/${{ github.repository }}"
-          CURRENT_TAG="${{ steps.meta.outputs.tag }}"
-          PREVIOUS_TAG="${{ steps.release_context.outputs.previous_tag }}"
-          VERSION="${{ steps.meta.outputs.version }}"
-          TITLE="${{ steps.meta.outputs.title }}"
-          DESCRIPTION="${{ steps.meta.outputs.description }}"
+          CURRENT_TAG="${{ steps.release.outputs.tag }}"
+          PREVIOUS_TAG="${{ steps.release.outputs.previous_tag }}"
 
           if [ -n "$PREVIOUS_TAG" ]; then
             RANGE="$PREVIOUS_TAG..${{ github.sha }}"
@@ -142,37 +195,45 @@ jobs:
 
           {
             echo "### Release Info"
-            echo "- Version: $VERSION"
+            echo "- Version: ${{ steps.release.outputs.version }}"
+            echo "- SemVer bump: ${{ steps.release.outputs.bump }}"
             echo "- Tag: $CURRENT_TAG"
-            echo "- Commit: ${{ github.sha }}"
+            echo "- Source commit: ${{ github.sha }}"
             echo "$COMPARE_LINE"
             echo
             echo "### Changes"
-            if [ -n "$PREVIOUS_TAG" ]; then
-              git log "$RANGE" --pretty=format:'- %s (%h)'
-            else
-              echo "- Initial release"
-            fi
+            git log "$RANGE" --pretty=format:'- %s (%h)'
+            echo
             echo
             echo "### Artifact"
-            echo "- VSIX package attached to this release"
+            echo "- Identical VSIX published to Visual Studio Marketplace and Open VSX"
           } > RELEASE_NOTES.md
 
-      - name: Show release notes
-        if: steps.check_release.outputs.exists == 'false'
-        shell: bash
-        run: cat RELEASE_NOTES.md
-
       - name: Create GitHub release
-        if: steps.check_release.outputs.exists == 'false'
+        if: steps.release.outputs.needed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          gh release create "${{ steps.meta.outputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --target "${{ github.sha }}" \
-            --title "${{ steps.meta.outputs.title }}" \
-            --verify-tag \
-            --notes-file RELEASE_NOTES.md \
-            ./*.vsix
+          TAG="${{ steps.release.outputs.tag }}"
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${{ steps.vsix.outputs.path }}" \
+              --repo "${{ github.repository }}" \
+              --clobber
+          else
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --target "$TAG" \
+              --title "$TAG" \
+              --verify-tag \
+              --notes-file RELEASE_NOTES.md \
+              "${{ steps.vsix.outputs.path }}"
+          fi
+
+      - name: Upload workflow artifact
+        if: steps.release.outputs.needed == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: faah-${{ steps.release.outputs.version }}-vsix
+          path: ${{ steps.vsix.outputs.path }}
+          if-no-files-found: error

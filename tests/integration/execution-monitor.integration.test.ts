@@ -308,4 +308,66 @@ describe("execution monitor integration tests", () => {
 
     expect(playAlert).not.toHaveBeenCalled();
   });
+
+  it("stops draining the terminal stream once monitoring is disabled", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    let yields = 0;
+    let settings = createSettings();
+    const execution = {
+      read: async function* () {
+        yields += 1;
+        yield "first chunk\n";
+        settings = createSettings({ enabled: false });
+        yields += 1;
+        yield "error happened later\n";
+        yields += 1;
+        yield "even more output\n";
+      },
+    } as any;
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(yields).toBeLessThanOrEqual(2);
+    expect(playAlert).not.toHaveBeenCalled();
+  });
+
+  it("does not alert for an execution whose monitor state was reset mid-stream", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const settings = createSettings();
+    const execution = {
+      read: async function* () {
+        executionMonitor.resetExecutionMonitorState();
+        yield "error happened\n";
+      },
+    } as any;
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(playAlert).not.toHaveBeenCalled();
+  });
+
+  it("truncates very long lines before matching user patterns", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const longLine = `${"x".repeat(50_000)} error happened\n`;
+    const execution = createExecution([longLine]) as any;
+    const settings = createSettings();
+
+    const startedAt = Date.now();
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+    expect(playAlert).toHaveBeenCalledTimes(1);
+  });
 });

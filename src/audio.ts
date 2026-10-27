@@ -76,13 +76,13 @@ function showMissingSoundFileWarning(soundPath: string): void {
   lastMissingSoundWarningPath = soundPath;
 
   if (path.basename(soundPath) === fixedSoundFile) {
-    vscode.window.showWarningMessage(
+    void vscode.window.showWarningMessage(
       `Faah could not find audio file: ${fixedSoundFile} in media/.`,
     );
     return;
   }
 
-  vscode.window.showWarningMessage(
+  void vscode.window.showWarningMessage(
     `Faah could not find audio file at: ${soundPath}`,
   );
 }
@@ -93,7 +93,7 @@ function showInvalidCustomSoundFallbackWarning(
 ): void {
   if (lastInvalidCustomSoundWarningPath === resolvedCustomSoundPath) return;
   lastInvalidCustomSoundWarningPath = resolvedCustomSoundPath;
-  vscode.window.showWarningMessage(
+  void vscode.window.showWarningMessage(
     `Faah custom sound not found: ${rawCustomSoundPath}. Using default ${fixedSoundFile}.`,
   );
 }
@@ -126,7 +126,7 @@ function warnLinuxPlayerMissingOnce(errorText: string): void {
     return;
 
   hasWarnedLinuxMissingPlayer = true;
-  vscode.window.showWarningMessage(
+  void vscode.window.showWarningMessage(
     "Faah could not find a Linux audio player. Install one of: ffmpeg (ffplay), mpv, mpg123, vlc, or sox.",
   );
 }
@@ -417,7 +417,7 @@ function buildCustomVolumeOptions(
     mplayer: ["-volume", Math.round(ratio * 100)],
     mpg123: ["-f", Math.round(ratio * 32768)],
     mpg321: ["-g", Math.round(ratio * 100)],
-    play: ["-v", ratio],
+    play: ["-v", Math.round(ratio * 100)],
     cvlc: [`--gain=${ratio}`],
     paplay: [`--volume=${Math.round(ratio * 65536)}`],
     ffplay: [

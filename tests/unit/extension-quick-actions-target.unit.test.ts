@@ -94,6 +94,7 @@ describe("extension quick action persistence", () => {
     }));
 
     vi.doMock("../../src/settings-webview", () => ({
+      notifySettingsPanelUpdated: vi.fn(),
       registerSettingsUiCommand: vi.fn(() => ({ dispose: vi.fn() })),
       saveTargetStorageKey: "faah.settings.saveTarget.v1",
     }));
