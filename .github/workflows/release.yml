@@ -1,19 +1,6 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "media/**"
-      - "images/**"
-      - "README.md"
-      - "LICENSE"
-      - "package.json"
-      - "bun.lock"
-      - ".vscodeignore"
-      - "tsconfig.json"
-      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:
@@ -26,6 +13,7 @@ concurrency:
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
