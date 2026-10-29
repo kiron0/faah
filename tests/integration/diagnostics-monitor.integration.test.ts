@@ -108,6 +108,42 @@ describe("diagnostics monitor integration tests", () => {
     vi.restoreAllMocks();
   });
 
+  it("does not re-alert when an unchanged error only moves to another line", async () => {
+    const harness = await loadDiagnosticsMonitorHarness();
+    const settings = createSettings();
+    const activeKey = harness.activeUri.toString();
+
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("same error", 0, 3),
+    ]);
+    harness.diagnosticsMonitor.scanActiveEditorDiagnostics(
+      () => settings,
+      () => "media/faah.wav",
+    );
+    expect(harness.playAlert).toHaveBeenCalledTimes(1);
+
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("same error", 0, 4),
+    ]);
+    harness.diagnosticsMonitor.onDiagnosticsChanged(
+      { uris: [harness.activeUri] } as any,
+      () => settings,
+      () => "media/faah.wav",
+    );
+    expect(harness.playAlert).toHaveBeenCalledTimes(1);
+
+    harness.diagnosticsByUri.set(activeKey, [
+      createDiagnostic("same error", 0, 4),
+      createDiagnostic("same error", 0, 9),
+    ]);
+    harness.diagnosticsMonitor.onDiagnosticsChanged(
+      { uris: [harness.activeUri] } as any,
+      () => settings,
+      () => "media/faah.wav",
+    );
+    expect(harness.playAlert).toHaveBeenCalledTimes(2);
+  });
+
   it("plays alert once for unchanged active-file diagnostics and again after a new error", async () => {
     const harness = await loadDiagnosticsMonitorHarness();
     const settings = createSettings();

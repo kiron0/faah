@@ -68,6 +68,7 @@ async function showCliSetupGuide(): Promise<void> {
 }
 
 const editorDiagnosticsTypingDebounceMs = 300;
+const interruptedExitCode = 130;
 const statusRefreshIntervalMs = 15_000;
 const configurationReloadDebounceMs = 60;
 const onboardingStateKey = "faah.onboarding.seenVersion";
@@ -264,6 +265,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const patternsChanged =
       !sameStringArrays(
+        previousStoredSettings.excludePresetIds,
+        nextStoredSettings.excludePresetIds,
+      ) ||
+      !sameStringArrays(
         previousStoredSettings.patterns,
         nextStoredSettings.patterns,
       ) ||
@@ -419,6 +424,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!settings.enabled || !settings.monitorTerminal) return;
       if (settings.terminalDetectionMode === "output") return;
       if (event.exitCode === undefined || event.exitCode === 0) return;
+      if (event.exitCode === interruptedExitCode) return;
       if (!isExecutionIdentity(event.execution)) return;
       tryPlayForExecution(event.execution, settings, soundPath);
     });
@@ -833,6 +839,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const activeEditor = windowApi?.activeTextEditor;
       if (!activeEditor) return;
       if (
+        event.document !== activeEditor.document &&
         event.document.uri.toString() !== activeEditor.document.uri.toString()
       )
         return;

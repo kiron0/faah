@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as vscode from "vscode";
@@ -17,13 +18,7 @@ import {
 import type { TerminalMonitoringCapability } from "./terminal-shell-integration";
 
 function getNonce(): string {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let value = "";
-  for (let i = 0; i < 32; i += 1) {
-    value += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return value;
+  return randomBytes(24).toString("base64url");
 }
 
 export const saveTargetStorageKey = "faah.settings.saveTarget.v1";

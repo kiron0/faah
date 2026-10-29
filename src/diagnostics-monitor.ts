@@ -41,8 +41,7 @@ function isDiagnosticExcluded(
 function serializeDiagnostic(diagnostic: vscode.Diagnostic): string {
   const code = normalizeDiagnosticCode(diagnostic.code);
   const source = diagnostic.source ?? "";
-  const line = diagnostic.range.start.line;
-  return `${source}|${code}|${line}|${diagnostic.message}`;
+  return `${source}|${code}|${diagnostic.message}`;
 }
 
 function hashString(value: string): string {

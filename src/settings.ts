@@ -173,6 +173,10 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 type CompiledRegexCacheEntry = {
   key: string;
   patterns: RegExp[];
@@ -323,7 +327,7 @@ export function normalizeStoredSettings(
 ): StoredSettings {
   const source = input ?? {};
   const fallbackCooldownMs = Math.max(
-    typeof source.cooldownMs === "number"
+    isFiniteNumber(source.cooldownMs)
       ? source.cooldownMs
       : defaultStoredSettings.cooldownMs,
     minCooldownMs,
@@ -362,13 +366,13 @@ export function normalizeStoredSettings(
     ),
     cooldownMs: fallbackCooldownMs,
     terminalCooldownMs: Math.max(
-      typeof source.terminalCooldownMs === "number"
+      isFiniteNumber(source.terminalCooldownMs)
         ? source.terminalCooldownMs
         : fallbackCooldownMs,
       minCooldownMs,
     ),
     diagnosticsCooldownMs: Math.max(
-      typeof source.diagnosticsCooldownMs === "number"
+      isFiniteNumber(source.diagnosticsCooldownMs)
         ? source.diagnosticsCooldownMs
         : fallbackCooldownMs,
       minCooldownMs,
@@ -379,7 +383,7 @@ export function normalizeStoredSettings(
       defaultStoredSettings.patternMode,
     ),
     volumePercent: clamp(
-      typeof source.volumePercent === "number"
+      isFiniteNumber(source.volumePercent)
         ? source.volumePercent
         : defaultStoredSettings.volumePercent,
       0,

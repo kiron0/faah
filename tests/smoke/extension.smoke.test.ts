@@ -294,6 +294,15 @@ async function loadExtensionHarness(
 }
 
 describe("extension smoke tests", () => {
+  it("does not alert when a terminal command was interrupted (exit 130)", async () => {
+    const harness = await loadExtensionHarness(true);
+    harness.extension.activate(harness.context as any);
+    const endHandler = harness.getEndHandler();
+
+    endHandler?.({ execution: { read: async function* () {} }, exitCode: 130 });
+    expect(harness.mocks.tryPlayForExecution).not.toHaveBeenCalled();
+  });
+
   it("wires terminal and diagnostics listeners on activate", async () => {
     const harness = await loadExtensionHarness(true);
     harness.extension.activate(harness.context as any);

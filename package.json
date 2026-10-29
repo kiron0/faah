@@ -281,7 +281,7 @@
     "test:integration": "vitest run tests/integration",
     "test:smoke": "vitest run tests/smoke",
     "vscode:prepublish": "npm run compile",
-    "package": "npx @vscode/vsce package --no-yarn",
+    "package": "vsce package --no-yarn",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "check-all": "bun run format && bun run lint && bun run test && bun run test:unit && bun run test:integration && bun run test:smoke && bun run build"
   },
@@ -292,7 +292,7 @@
     "@types/node": "^26.6.5",
     "@types/play-sound": "^1.1.2",
     "@types/vscode": "~1.105.0",
-    "@vscode/vsce": "^4.0.0",
+    "@vscode/vsce": "^4.1.0",
     "ovsx": "^1.3.0",
     "prettier": "^3.9.10",
     "typescript": "^7.0.2",

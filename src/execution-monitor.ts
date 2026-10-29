@@ -115,6 +115,7 @@ export async function monitorExecutionOutput(
       if (!settings.monitorTerminal) break;
       if (!shouldMonitorTerminalOutput(settings)) break;
       if (generation !== monitorGeneration) break;
+      if (playedByExecution.has(execution)) continue;
 
       if (
         hasErrorInChunk(
@@ -130,8 +131,10 @@ export async function monitorExecutionOutput(
 
     const settings = getSettings();
     const finalTail = tailByExecution.get(execution) ?? "";
+    tailByExecution.delete(execution);
     if (
       generation === monitorGeneration &&
+      !playedByExecution.has(execution) &&
       settings.enabled &&
       settings.monitorTerminal &&
       shouldMonitorTerminalOutput(settings) &&

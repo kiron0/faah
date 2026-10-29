@@ -417,7 +417,7 @@ function buildCustomVolumeOptions(
     mplayer: ["-volume", Math.round(ratio * 100)],
     mpg123: ["-f", Math.round(ratio * 32768)],
     mpg321: ["-g", Math.round(ratio * 100)],
-    play: ["-v", Math.round(ratio * 100)],
+    play: ["-v", ratio],
     cvlc: [`--gain=${ratio}`],
     paplay: [`--volume=${Math.round(ratio * 65536)}`],
     ffplay: [

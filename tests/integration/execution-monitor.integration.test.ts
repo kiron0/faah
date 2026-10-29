@@ -58,6 +58,26 @@ async function loadExecutionMonitor() {
 }
 
 describe("execution monitor integration tests", () => {
+  it("stops running patterns once an execution already alerted", async () => {
+    const { executionMonitor, playAlert } = await loadExecutionMonitor();
+    const execution = createExecution([
+      "error: first\n",
+      ...Array.from({ length: 50 }, (_, i) => `error: line ${i}\n`),
+    ]) as any;
+    const pattern = /\berror\b/i;
+    const testSpy = vi.spyOn(pattern, "test");
+    const settings = createSettings({ patterns: [pattern] });
+
+    await executionMonitor.monitorExecutionOutput(
+      execution,
+      () => settings,
+      () => "media/faah.wav",
+    );
+
+    expect(playAlert).toHaveBeenCalledTimes(1);
+    expect(testSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("plays alert once when error text spans chunk boundaries", async () => {
     const { executionMonitor, playAlert } = await loadExecutionMonitor();
     const execution = createExecution(["build ERR", "OR happened\n"]) as any;
