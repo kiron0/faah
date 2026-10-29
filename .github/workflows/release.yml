@@ -1,7 +1,21 @@
 name: Release
 
+# Manual only: Actions > Release > Run workflow (on main). Pushes never release.
+# The version comes from package.json. A release happens only when it is
+# higher than the latest vX.Y.Z tag; equal skips, lower fails.
+#
+# Flow:
+#   1. Bump "version" in package.json (no tag), run tests locally.
+#   2. git commit && git push   (runs CI only)
+#   3. Actions > Release > Run workflow   (publish, tag, GitHub release)
+
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate and package only; do not publish, tag or create a release"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -13,15 +27,34 @@ concurrency:
 
 jobs:
   release:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
+      - name: Validate trigger
+        shell: bash
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error title=Wrong branch::Release must run on main (got ${{ github.ref }}). Release tags are created on main."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate commit is current main
+        shell: bash
+        run: |
+          git fetch --quiet origin main
+          HEAD_SHA=$(git rev-parse HEAD)
+          MAIN_SHA=$(git rev-parse origin/main)
+          if [ "$HEAD_SHA" != "$MAIN_SHA" ]; then
+            echo "::error title=Stale commit::Checked-out $HEAD_SHA is not the tip of main ($MAIN_SHA). Re-run the workflow."
+            exit 1
+          fi
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -33,77 +66,105 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Lint
-        run: bun run lint
-
-      - name: Compile
-        run: bun run compile
-
-      - name: Test
-        run: bun run test
-
-      - name: Plan release
+      - name: Check version against latest tag
         id: release
         shell: bash
         run: |
-          PREVIOUS_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)
+          for field in name publisher displayName version main engines.vscode; do
+            VALUE=$(jq -r ".${field} // empty | strings" package.json)
+            if [ -z "$VALUE" ]; then
+              echo "::error title=Invalid package.json::Missing required field: ${field}."
+              exit 1
+            fi
+          done
 
-          if [ -n "$PREVIOUS_TAG" ]; then
-            RANGE="$PREVIOUS_TAG..HEAD"
-            BASE_VERSION="${PREVIOUS_TAG#v}"
+          VERSION=$(jq -r .version package.json)
+          SEMVER='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          if ! [[ "$VERSION" =~ $SEMVER ]]; then
+            echo "::error title=Invalid version::package.json version \"$VERSION\" must be MAJOR.MINOR.PATCH (no v prefix or pre-release suffix)."
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          LATEST_TAG=$(git tag --list 'v*' --sort=-v:refname | grep -E "^v${SEMVER#^}" | head -n 1 || true)
+
+          if [ -z "$LATEST_TAG" ]; then
+            NEEDED=true
+            echo "No release tags yet. Releasing $TAG."
+          elif [ "$TAG" = "$LATEST_TAG" ]; then
+            NEEDED=false
+            echo "::notice title=Release skipped::package.json version $VERSION equals latest tag $LATEST_TAG. Bump package.json to release."
+          elif [ "$(printf '%s\n%s\n' "$VERSION" "${LATEST_TAG#v}" | sort -V | head -n 1)" = "$VERSION" ]; then
+            echo "::error title=Version too low::package.json version $VERSION is lower than latest tag $LATEST_TAG."
+            exit 1
           else
-            RANGE="HEAD"
-            BASE_VERSION=$(node -p "require('./package.json').version")
+            NEEDED=true
+            echo "Releasing $TAG (previous $LATEST_TAG)."
           fi
-
-          if [ "$(git rev-list --count "$RANGE")" -eq 0 ]; then
-            echo "needed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          SUBJECTS=$(git log "$RANGE" --format='%s')
-          MESSAGES=$(git log "$RANGE" --format='%s%n%b')
-          BUMP=patch
-
-          if printf '%s\n' "$MESSAGES" | grep -Eq '(^|[[:space:]])BREAKING CHANGE:|^[[:alnum:]_-]+(\([^)]+\))?!:'; then
-            BUMP=major
-          elif printf '%s\n' "$SUBJECTS" | grep -Eq '^feat(\([^)]+\))?:'; then
-            BUMP=minor
-          fi
-
-          NEXT_VERSION=$(node - "$BASE_VERSION" "$BUMP" <<'NODE'
-          const [major, minor, patch] = process.argv[2].split(".").map(Number);
-          const bump = process.argv[3];
-          if (![major, minor, patch].every(Number.isInteger)) {
-            throw new Error(`Invalid base version: ${process.argv[2]}`);
-          }
-          const next = bump === "major"
-            ? [major + 1, 0, 0]
-            : bump === "minor"
-              ? [major, minor + 1, 0]
-              : [major, minor, patch + 1];
-          process.stdout.write(next.join("."));
-          NODE
-          )
-
-          node - "$NEXT_VERSION" <<'NODE'
-          const fs = require("node:fs");
-          const path = "package.json";
-          const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
-          pkg.version = process.argv[2];
-          fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
-          NODE
 
           {
-            echo "needed=true"
-            echo "previous_tag=$PREVIOUS_TAG"
-            echo "version=$NEXT_VERSION"
-            echo "tag=v$NEXT_VERSION"
-            echo "bump=$BUMP"
+            echo "needed=$NEEDED"
+            echo "version=$VERSION"
+            echo "tag=$TAG"
+            echo "previous_tag=$LATEST_TAG"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Warn about incomplete previous release
+        if: steps.release.outputs.needed == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::warning title=Incomplete release::Tag $TAG exists but has no GitHub release. Create it manually or bump package.json."
+          fi
+
+      - name: Validate tag and GitHub release do not exist yet
+        if: steps.release.outputs.needed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error title=Tag exists::Tag $TAG already exists on origin. Bump package.json."
+            exit 1
+          fi
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error title=Release exists::GitHub release $TAG already exists. Bump package.json."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        if: steps.release.outputs.needed == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Format check
+        if: steps.release.outputs.needed == 'true'
+        run: ./node_modules/.bin/prettier --check "**/*.{ts,tsx,json,md}"
+
+      - name: Typecheck
+        if: steps.release.outputs.needed == 'true'
+        run: bun run lint
+
+      - name: Compile
+        if: steps.release.outputs.needed == 'true'
+        run: bun run compile
+
+      - name: Validate compiled entry point
+        if: steps.release.outputs.needed == 'true'
+        shell: bash
+        run: |
+          MAIN=$(node -p "require('./package.json').main")
+          if [ ! -f "$MAIN" ]; then
+            echo "::error title=Missing entry point::package.json main ($MAIN) was not produced by compile."
+            exit 1
+          fi
+
+      - name: Test
+        if: steps.release.outputs.needed == 'true'
+        run: bun run test
 
       - name: Inspect package contents
         if: steps.release.outputs.needed == 'true'
@@ -113,20 +174,62 @@ jobs:
         if: steps.release.outputs.needed == 'true'
         run: bun run package
 
-      - name: Resolve VSIX
+      - name: Validate VSIX
         if: steps.release.outputs.needed == 'true'
         id: vsix
         shell: bash
         run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          NAME=$(node -p "require('./package.json').name")
+          EXPECTED="./$NAME-$VERSION.vsix"
+
           mapfile -t files < <(find . -maxdepth 1 -type f -name '*.vsix' -print)
-          if [ "${#files[@]}" -ne 1 ]; then
-            echo "Expected exactly one VSIX, found ${#files[@]}." >&2
+          if [ "${#files[@]}" -ne 1 ] || [ "${files[0]}" != "$EXPECTED" ]; then
+            echo "::error title=Unexpected VSIX::Expected exactly $EXPECTED, found: ${files[*]:-none}."
             exit 1
           fi
-          echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
+
+          MANIFEST_VERSION=$(unzip -p "$EXPECTED" extension.vsixmanifest | grep -o '<Identity [^>]*' | grep -o 'Version="[^"]*"' | head -n 1 | cut -d'"' -f2)
+          PACKAGED_VERSION=$(unzip -p "$EXPECTED" extension/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')
+          if [ "$MANIFEST_VERSION" != "$VERSION" ] || [ "$PACKAGED_VERSION" != "$VERSION" ]; then
+            echo "::error title=Version mismatch::VSIX manifest=$MANIFEST_VERSION, packaged package.json=$PACKAGED_VERSION, expected $VERSION."
+            exit 1
+          fi
+
+          for required in extension/package.json extension/out/extension.js extension/media/faah.wav; do
+            if ! unzip -l "$EXPECTED" "$required" >/dev/null 2>&1; then
+              echo "::error title=Missing file in VSIX::$required is not packaged. Check .vscodeignore."
+              exit 1
+            fi
+          done
+
+          if unzip -l "$EXPECTED" | grep -E 'extension/(src|tests|\.github)/' >/dev/null; then
+            echo "::error title=Dev files in VSIX::Source or tests were packaged. Check .vscodeignore."
+            exit 1
+          fi
+
+          echo "path=$EXPECTED" >> "$GITHUB_OUTPUT"
+
+      - name: Validate working tree is clean
+        if: steps.release.outputs.needed == 'true'
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            git status --short
+            echo "::error title=Dirty tree::The build changed tracked files. Commit those changes first."
+            exit 1
+          fi
+
+      - name: Upload workflow artifact
+        if: steps.release.outputs.needed == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: faah-${{ steps.release.outputs.version }}-vsix
+          path: ${{ steps.vsix.outputs.path }}
+          if-no-files-found: error
 
       - name: Publish to Visual Studio Marketplace
-        if: steps.release.outputs.needed == 'true'
+        if: steps.release.outputs.needed == 'true' && !inputs.dry_run
         run: >-
           ./node_modules/.bin/vsce publish
           --oidc
@@ -134,39 +237,25 @@ jobs:
           --packagePath "${{ steps.vsix.outputs.path }}"
 
       - name: Publish to Open VSX
-        if: steps.release.outputs.needed == 'true'
+        if: steps.release.outputs.needed == 'true' && !inputs.dry_run
         run: >-
           ./node_modules/.bin/ovsx publish
           "${{ steps.vsix.outputs.path }}"
           --trusted-publishing
           --skip-duplicate
 
-      - name: Commit release version
-        if: steps.release.outputs.needed == 'true'
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(release): ${{ steps.release.outputs.tag }} [skip ci]"
-            git push origin HEAD:main
-          fi
-
       - name: Create and push tag
-        if: steps.release.outputs.needed == 'true'
+        if: steps.release.outputs.needed == 'true' && !inputs.dry_run
         shell: bash
         run: |
           TAG="${{ steps.release.outputs.tag }}"
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            git fetch origin "refs/tags/$TAG:refs/tags/$TAG"
-          else
-            git tag "$TAG" HEAD
-            git push origin "refs/tags/$TAG"
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG" "${{ github.sha }}"
+          git push origin "refs/tags/$TAG"
 
       - name: Generate release notes
-        if: steps.release.outputs.needed == 'true'
+        if: steps.release.outputs.needed == 'true' && !inputs.dry_run
         shell: bash
         run: |
           REPO_URL="https://github.com/${{ github.repository }}"
@@ -184,7 +273,6 @@ jobs:
           {
             echo "### Release Info"
             echo "- Version: ${{ steps.release.outputs.version }}"
-            echo "- SemVer bump: ${{ steps.release.outputs.bump }}"
             echo "- Tag: $CURRENT_TAG"
             echo "- Source commit: ${{ github.sha }}"
             echo "$COMPARE_LINE"
@@ -198,29 +286,31 @@ jobs:
           } > RELEASE_NOTES.md
 
       - name: Create GitHub release
-        if: steps.release.outputs.needed == 'true'
+        if: steps.release.outputs.needed == 'true' && !inputs.dry_run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          TAG="${{ steps.release.outputs.tag }}"
-          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${{ steps.vsix.outputs.path }}" \
-              --repo "${{ github.repository }}" \
-              --clobber
-          else
-            gh release create "$TAG" \
-              --repo "${{ github.repository }}" \
-              --title "$TAG" \
-              --verify-tag \
-              --notes-file RELEASE_NOTES.md \
-              "${{ steps.vsix.outputs.path }}"
-          fi
+          gh release create "${{ steps.release.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ steps.release.outputs.tag }}" \
+            --verify-tag \
+            --notes-file RELEASE_NOTES.md \
+            "${{ steps.vsix.outputs.path }}"
 
-      - name: Upload workflow artifact
-        if: steps.release.outputs.needed == 'true'
-        uses: actions/upload-artifact@v5
-        with:
-          name: faah-${{ steps.release.outputs.version }}-vsix
-          path: ${{ steps.vsix.outputs.path }}
-          if-no-files-found: error
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Release"
+            echo "- package.json version: ${{ steps.release.outputs.version || 'n/a' }}"
+            echo "- Latest tag before run: ${{ steps.release.outputs.previous_tag || 'none' }}"
+            if [ "${{ steps.release.outputs.needed }}" = "false" ]; then
+              echo "- Result: skipped (version equals latest tag; bump package.json to release)"
+            elif [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "- Result: dry run (validated and packaged; nothing published)"
+            else
+              echo "- Result: ${{ job.status }}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
