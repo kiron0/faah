@@ -68,6 +68,8 @@ jobs:
 
       - name: Check version against latest tag
         id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           for field in name publisher displayName version main engines.vscode; do
@@ -86,14 +88,28 @@ jobs:
           fi
 
           TAG="v$VERSION"
-          LATEST_TAG=$(git tag --list 'v*' --sort=-v:refname | grep -E "^v${SEMVER#^}" | head -n 1 || true)
+          SEMVER_TAGS=$(git tag --list 'v*' --sort=-v:refname | grep -E "^v${SEMVER#^}" || true)
+          LATEST_TAG=$(printf '%s\n' "$SEMVER_TAGS" | head -n 1)
+          RESUME=false
 
           if [ -z "$LATEST_TAG" ]; then
             NEEDED=true
             echo "No release tags yet. Releasing $TAG."
           elif [ "$TAG" = "$LATEST_TAG" ]; then
-            NEEDED=false
-            echo "::notice title=Release skipped::package.json version $VERSION equals latest tag $LATEST_TAG. Bump package.json to release."
+            # Same version as the latest tag: done, unless a previous run
+            # published and tagged but failed before the GitHub release.
+            if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+              NEEDED=false
+              echo "::notice title=Release skipped::package.json version $VERSION equals latest tag $LATEST_TAG and its GitHub release exists. Bump package.json to release."
+            elif [ "$(git rev-list -n 1 "$TAG")" = "${{ github.sha }}" ]; then
+              NEEDED=true
+              RESUME=true
+              LATEST_TAG=$(printf '%s\n' "$SEMVER_TAGS" | grep -vxF "$TAG" | head -n 1 || true)
+              echo "::warning title=Resuming release::Tag $TAG exists on this commit but has no GitHub release. Finishing the previous run."
+            else
+              echo "::error title=Incomplete release::Tag $TAG has no GitHub release and points to $(git rev-list -n 1 "$TAG"), not this commit. Create the release for $TAG manually, or bump package.json."
+              exit 1
+            fi
           elif [ "$(printf '%s\n%s\n' "$VERSION" "${LATEST_TAG#v}" | sort -V | head -n 1)" = "$VERSION" ]; then
             echo "::error title=Version too low::package.json version $VERSION is lower than latest tag $LATEST_TAG."
             exit 1
@@ -104,24 +120,14 @@ jobs:
 
           {
             echo "needed=$NEEDED"
+            echo "resume=$RESUME"
             echo "version=$VERSION"
             echo "tag=$TAG"
             echo "previous_tag=$LATEST_TAG"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Warn about incomplete previous release
-        if: steps.release.outputs.needed == 'false'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          TAG="${{ steps.release.outputs.tag }}"
-          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            echo "::warning title=Incomplete release::Tag $TAG exists but has no GitHub release. Create it manually or bump package.json."
-          fi
-
       - name: Validate tag and GitHub release do not exist yet
-        if: steps.release.outputs.needed == 'true'
+        if: steps.release.outputs.needed == 'true' && steps.release.outputs.resume != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -249,6 +255,10 @@ jobs:
         shell: bash
         run: |
           TAG="${{ steps.release.outputs.tag }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already on origin (resumed run); not re-creating it."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$TAG" -m "Release $TAG" "${{ github.sha }}"
@@ -291,9 +301,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          gh release create "${{ steps.release.outputs.tag }}" \
+          TAG="${{ steps.release.outputs.tag }}"
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${{ steps.vsix.outputs.path }}" \
+              --repo "${{ github.repository }}" \
+              --clobber
+            exit 0
+          fi
+          gh release create "$TAG" \
             --repo "${{ github.repository }}" \
-            --title "${{ steps.release.outputs.tag }}" \
+            --title "$TAG" \
             --verify-tag \
             --notes-file RELEASE_NOTES.md \
             "${{ steps.vsix.outputs.path }}"
