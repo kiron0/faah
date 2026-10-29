@@ -223,7 +223,6 @@ jobs:
           else
             gh release create "$TAG" \
               --repo "${{ github.repository }}" \
-              --target "$TAG" \
               --title "$TAG" \
               --verify-tag \
               --notes-file RELEASE_NOTES.md \
