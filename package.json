@@ -5,7 +5,7 @@
   "displayName": "Faah - Error Alerts",
   "description": "Instant drama the second your code breaks. Audio alerts for terminal errors and editor diagnostics.",
   "icon": "images/icon.png",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "thk",
   "author": "Toufiq Hasan Kiron",
   "license": "MIT",
